@@ -31,6 +31,7 @@ class TestTrajectoriesContactsRegions(unittest.TestCase):
         self.format_output = "svg"
         self.atoms_dist = 3.0
         self.residues_dist = 10
+        self.roi = [682, 838]
 
     def tearDown(self):
         # Clean temporary files
@@ -39,6 +40,8 @@ class TestTrajectoriesContactsRegions(unittest.TestCase):
     def test_extract_roi(self):
         self.assertRaises(argparse.ArgumentTypeError, extract_roi, "682_838")
         self.assertRaises(argparse.ArgumentTypeError, extract_roi, "422")
+        roi_observed = extract_roi("682-838")
+        self.assertListEqual(roi_observed, self.roi)
 
 
 if __name__ == '__main__':

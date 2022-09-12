@@ -133,13 +133,20 @@ if __name__ == "__main__":
     bed = pd.read_csv(args.bed, sep="\t", header=None, names=["id", "start", "stop", "region"])
     print(bed)
 
+    # load the contacts file
+    contacts = pd.read_csv(args.input, sep=",")
+    print(contacts)
+
     # check the region of interest if any
     if args.roi:
         try:
-            roi = extract_roi(args.roi, bed)
+            roi = extract_roi(args.roi)
+            # reduce to the region of interest limits
+            contacts = contacts[contacts["donor position"].between(roi[0], roi[1])]
+            print(contacts)
         except argparse.ArgumentTypeError as exc:
-            logging.info(exc, exc_info=True)
+            logging.error(exc, exc_info=True)
             sys.exit(1)
 
-    # load the contacts file
-    # contacts
+
+
