@@ -92,6 +92,7 @@ def extract_contacts_with_atoms_distance(path_contacts, roi_str, col, thr):
     """
     # load the contacts file
     df = pd.read_csv(path_contacts, sep=",")
+    logging.debug(f"{len(df)} contacts for the raw data.")
     # select the donors region of interest if any
     roi_text = ""
     if roi_str:
@@ -99,12 +100,14 @@ def extract_contacts_with_atoms_distance(path_contacts, roi_str, col, thr):
             roi = extract_roi(roi_str)
             # reduce to the donors region of interest limits
             df = df[df["donor position"].between(roi[0], roi[1])]
+            logging.debug(f"{len(df)} contacts in the region of interest.")
             roi_text = f" in the donors region of interest {roi_str}"
         except argparse.ArgumentTypeError as exc:
             logging.error(exc, exc_info=True)
             sys.exit(1)
     try:
-        df = df[df[col] >= thr]
+        df = df[df[col] <= thr]
+        logging.debug(f"{len(df)} contacts for under the distance threshold of {thr} \u212B in column \"{col}\".")
     except KeyError as exc:
         logging.error(f"\"{col}\" column name does not exists in the CSV file.", exc_info=True)
         sys.exit(1)
@@ -122,8 +125,9 @@ def outliers_contacts(df, thr, col):
     for idx, row in df.iterrows():
         if abs(row["donor position"] - row["acceptor position"]) < thr:
             idx_to_remove.append(idx)
-    print(idx_to_remove)
+    # remove rows with too close distance between the residues
     df.drop(idx_to_remove, inplace=True, axis=0)
+    # reduce to one row when more than one atom per residue
     return df
 
 
@@ -182,6 +186,7 @@ if __name__ == "__main__":
 
     contacts = extract_contacts_with_atoms_distance(args.input, args.roi, args.col_distance, args.atoms_distance)
     print(contacts)
+    contacts.to_csv(os.path.join(args.out, "filtered_contacts_HEPAC-26_RPL6_ORF1_0.csv"))
 
     outliers = outliers_contacts(contacts, args.residues_distance, args.col_distance)
     print(outliers)
