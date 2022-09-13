@@ -16,7 +16,7 @@ import uuid
 
 import pandas as pd
 from pandas.testing import assert_frame_equal
-from trajectories_contacts_regions import extract_roi, extract_contacts_with_atoms_distance
+from trajectories_outliers_contacts import extract_roi, extract_contacts_with_atoms_distance
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_FILES_DIR = os.path.join(TEST_DIR, "test_files")
@@ -24,7 +24,7 @@ BIN_DIR = os.path.dirname(TEST_DIR)
 sys.path.append(BIN_DIR)
 
 
-class TestTrajectoriesContactsRegions(unittest.TestCase):
+class TestTrajectoriesOutliersContacts(unittest.TestCase):
 
     def setUp(self):
         system_tmp_dir = tempfile.gettempdir()
