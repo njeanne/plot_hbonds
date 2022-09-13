@@ -74,6 +74,59 @@ def extract_roi(roi_to_extract):
     return roi_extracted
 
 
+def extract_contacts_with_atoms_distance(path_contacts, roi_str, col, thr):
+    """
+    Extract the contacts from the CSV file residues contacts and filter on the donor region of interest (if any) and on
+    the threshold of the contacts distance column.
+
+    :param path_contacts: the path to the contacts CSV path.
+    :type path_contacts: str
+    :param roi_str: the string defining the donors residues region of interest.
+    :type roi_str: str
+    :param col: the name of the column to use for the atoms contacts between two residues.
+    :type col: str
+    :param thr: the maximal atoms distance threshold between two residues.
+    :type thr: float
+    :return: the filtered contacts.
+    :rtype: pd.Dataframe
+    """
+    # load the contacts file
+    df = pd.read_csv(path_contacts, sep=",")
+    # select the donors region of interest if any
+    roi_text = ""
+    if roi_str:
+        try:
+            roi = extract_roi(roi_str)
+            # reduce to the donors region of interest limits
+            df = df[df["donor position"].between(roi[0], roi[1])]
+            roi_text = f" in the donors region of interest {roi_str}"
+        except argparse.ArgumentTypeError as exc:
+            logging.error(exc, exc_info=True)
+            sys.exit(1)
+    try:
+        df = df[df[col] >= thr]
+    except KeyError as exc:
+        logging.error(f"\"{col}\" column name does not exists in the CSV file.", exc_info=True)
+        sys.exit(1)
+    except TypeError as exc:
+        logging.error(f"\"{col}\" column name may refers to a column that is not an atoms distances.", exc_info=True)
+        sys.exit(1)
+    logging.info(f"{len(df)} contacts detected{roi_text} for a maximal contacts distance of {thr} \u212B on column "
+                 f"\"{col.replace('_', ' ')}\".")
+    return df
+
+
+def outliers_contacts(df, thr, col):
+    """"""
+    idx_to_remove = []
+    for idx, row in df.iterrows():
+        if abs(row["donor position"] - row["acceptor position"]) < thr:
+            idx_to_remove.append(idx)
+    print(idx_to_remove)
+    df.drop(idx_to_remove, inplace=True, axis=0)
+    return df
+
+
 if __name__ == "__main__":
     descr = f"""
     {os.path.basename(__file__)} v. {__version__}
@@ -93,7 +146,9 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--out", required=True, type=str, help="the path to the output directory.")
     parser.add_argument("-b", "--bed", required=True, type=str,
                         help="the path to the BED file registering the amino acids regions positions.")
-    parser.add_argument("-i", "--roi", required=False, type=str)
+    parser.add_argument("-c", "--col-distance", required=True, type=str,
+                        help="the name of the column to use for the atoms distances.")
+    parser.add_argument("-i", "--roi", required=False, type=str, help="the donors region of interest.")
     parser.add_argument("-f", "--format", required=False, default="svg",
                         choices=["eps", "jpg", "jpeg", "pdf", "pgf", "png", "ps", "raw", "svg", "svgz", "tif", "tiff"],
                         help="the output plots format: 'eps': 'Encapsulated Postscript', "
@@ -118,37 +173,18 @@ if __name__ == "__main__":
     parser.add_argument("input", type=str, help="the donors/acceptors contacts CSV file.")
     args = parser.parse_args()
 
-    # create output directory if necessary
-    os.makedirs(args.out, exist_ok=True)
-
     # create the logger
-    if args.log:
-        log_path = args.log
-    else:
-        log_path = os.path.join(args.out, f"{os.path.splitext(os.path.basename(__file__))[0]}.log")
-    create_log(log_path, args.log_level)
-
-    logging.info(f"version: {__version__}")
-    logging.info(f"CMD: {' '.join(sys.argv)}")
+    create_log(args.log, args.log_level, args.out)
 
     # load the BED file
     bed = pd.read_csv(args.bed, sep="\t", header=None, names=["id", "start", "stop", "region"])
     print(bed)
 
-    # load the contacts file
-    contacts = pd.read_csv(args.input, sep=",")
+    contacts = extract_contacts_with_atoms_distance(args.input, args.roi, args.col_distance, args.atoms_distance)
     print(contacts)
 
-    # check the region of interest if any
-    if args.roi:
-        try:
-            roi = extract_roi(args.roi)
-            # reduce to the region of interest limits
-            contacts = contacts[contacts["donor position"].between(roi[0], roi[1])]
-            print(contacts)
-        except argparse.ArgumentTypeError as exc:
-            logging.error(exc, exc_info=True)
-            sys.exit(1)
+    outliers = outliers_contacts(contacts, args.residues_distance, args.col_distance)
+    print(outliers)
 
 
 
