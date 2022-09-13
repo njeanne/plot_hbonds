@@ -21,36 +21,38 @@ from matplotlib import rcParams
 import seaborn as sns
 
 
-def create_log(path, level):
+def create_log(log_path, level, out_dir):
     """Create the log as a text file and as a stream.
 
-    :param path: the path of the log.
-    :type path: str
+    :param log_path: the path of the log.
+    :type log_path: str
     :param level: the level og the log.
     :type level: str
-    :return: the logging:
-    :rtype: logging
+    :param out_dir: the results directory path.
+    :type out_dir: str
     """
-
+    os.makedirs(out_dir, exist_ok=True)
+    if not log_path:
+        log_path = os.path.join(out_dir, f"{os.path.splitext(os.path.basename(__file__))[0]}.log")
     log_level_dict = {"DEBUG": logging.DEBUG,
                       "INFO": logging.INFO,
                       "WARNING": logging.WARNING,
                       "ERROR": logging.ERROR,
                       "CRITICAL": logging.CRITICAL}
 
-    if level is None:
-        log_level = log_level_dict["INFO"]
-    else:
+    log_level = log_level_dict["INFO"]
+    if level:
         log_level = log_level_dict[args.log_level]
 
-    if os.path.exists(path):
-        os.remove(path)
+    if os.path.exists(log_path):
+        os.remove(log_path)
 
     logging.basicConfig(format="%(asctime)s %(levelname)s:\t%(message)s",
                         datefmt="%Y/%m/%d %H:%M:%S",
                         level=log_level,
-                        handlers=[logging.FileHandler(path), logging.StreamHandler()])
-    return logging
+                        handlers=[logging.FileHandler(log_path), logging.StreamHandler()])
+    logging.info(f"version: {__version__}")
+    logging.info(f"CMD: {' '.join(sys.argv)}")
 
 
 def extract_roi(roi_to_extract):
