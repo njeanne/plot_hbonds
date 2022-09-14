@@ -81,7 +81,7 @@ def extract_contacts_with_atoms_distance(path_contacts, roi_str, col, thr):
 
     :param path_contacts: the path to the contacts CSV path.
     :type path_contacts: str
-    :param roi_str: the string defining the donors residues region of interest.
+    :param roi_str: the string defining the donors residues region of interest, the format should be i.e: '100-200'.
     :type roi_str: str
     :param col: the name of the column to use for the atoms contacts between two residues.
     :type col: str
@@ -152,7 +152,9 @@ if __name__ == "__main__":
                         help="the path to the BED file registering the amino acids regions positions.")
     parser.add_argument("-c", "--col-distance", required=True, type=str,
                         help="the name of the column to use for the atoms distances.")
-    parser.add_argument("-i", "--roi", required=False, type=str, help="the donors region of interest.")
+    parser.add_argument("-i", "--roi", required=False, type=str,
+                        help="the donors region of interest coordinates, the format should be two digits separated by "
+                             "an hyphen, i.e: '100-200'.")
     parser.add_argument("-f", "--format", required=False, default="svg",
                         choices=["eps", "jpg", "jpeg", "pdf", "pgf", "png", "ps", "raw", "svg", "svgz", "tif", "tiff"],
                         help="the output plots format: 'eps': 'Encapsulated Postscript', "

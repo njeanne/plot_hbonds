@@ -61,6 +61,5 @@ class TestTrajectoriesOutliersContacts(unittest.TestCase):
         # with self.assertRaises(TypeError):
         #     extract_contacts_with_atoms_distance(raw_contacts, "682-838", "donor residue", self.atoms_dist)
 
-
 if __name__ == '__main__':
     unittest.main()
