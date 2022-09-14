@@ -38,6 +38,9 @@ class TestTrajectoriesOutliersContacts(unittest.TestCase):
         self.expected_filtered_contacts = pd.read_csv(os.path.join(TEST_FILES_DIR,
                                                                    "filtered_contacts_HEPAC-26_RPL6_ORF1_0.csv"),
                                                       sep=",", index_col=0)
+        self.expected_outliers_contacts = pd.read_csv(os.path.join(TEST_FILES_DIR,
+                                                                   "outliers_contacts_HEPAC-26_RPL6_ORF1_0.csv"),
+                                                      sep=",", index_col=0)
 
     def tearDown(self):
         # Clean temporary files
@@ -60,6 +63,11 @@ class TestTrajectoriesOutliersContacts(unittest.TestCase):
         #     extract_contacts_with_atoms_distance(raw_contacts, "682-838", "toto", self.atoms_dist)
         # with self.assertRaises(TypeError):
         #     extract_contacts_with_atoms_distance(raw_contacts, "682-838", "donor residue", self.atoms_dist)
+
+    def test_outliers_contacts(self):
+        observed = outliers_contacts(self.expected_filtered_contacts, self.residues_dist, self.col_distance)
+        assert_frame_equal(self.expected_outliers_contacts, observed)
+
 
 if __name__ == '__main__':
     unittest.main()

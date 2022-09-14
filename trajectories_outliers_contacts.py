@@ -92,7 +92,7 @@ def extract_contacts_with_atoms_distance(path_contacts, roi_str, col, thr):
     """
     # load the contacts file
     df = pd.read_csv(path_contacts, sep=",")
-    logging.debug(f"{len(df)} contacts for the raw data.")
+    logging.info(f"{len(df)} atoms contacts in the input data (residues pairs may have multiple atoms contacts).")
     # select the donors region of interest if any
     roi_text = ""
     if roi_str:
@@ -100,35 +100,98 @@ def extract_contacts_with_atoms_distance(path_contacts, roi_str, col, thr):
             roi = extract_roi(roi_str)
             # reduce to the donors region of interest limits
             df = df[df["donor position"].between(roi[0], roi[1])]
-            logging.debug(f"{len(df)} contacts in the region of interest.")
+            logging.debug(f"{len(df)} atoms contacts in the region of interest.")
             roi_text = f" in the donors region of interest {roi_str}"
         except argparse.ArgumentTypeError as exc:
             logging.error(exc, exc_info=True)
             sys.exit(1)
     try:
         df = df[df[col] <= thr]
-        logging.debug(f"{len(df)} contacts for under the distance threshold of {thr} \u212B in column \"{col}\".")
     except KeyError as exc:
         logging.error(f"\"{col}\" column name does not exists in the CSV file.", exc_info=True)
         sys.exit(1)
     except TypeError as exc:
         logging.error(f"\"{col}\" column name may refers to a column that is not an atoms distances.", exc_info=True)
         sys.exit(1)
-    logging.info(f"{len(df)} contacts detected{roi_text} for a maximal contacts distance of {thr} \u212B on column "
-                 f"\"{col.replace('_', ' ')}\".")
+    logging.debug(f"{len(df)} atoms contacts detected{roi_text} for a maximal contacts distance of {thr} \u212B on "
+                  f"column \"{col.replace('_', ' ')}\".")
     return df
 
 
-def outliers_contacts(df, thr, col):
-    """"""
-    idx_to_remove = []
+def unique_residues_pairs(df_not_unique, col):
+    """
+    Get the unique residues pairs contacts.
+
+    :param df_not_unique: the dataframe of contacts.
+    :type df_not_unique: pd.Dataframe
+    :param col: the atoms distances column name.
+    :type col: str
+    :return: the dataframe of unique residues pairs contacts.
+    :rtype: pd.Dataframe
+    """
+    donor_positions = []
+    donor_residues = []
+    acceptor_positions = []
+    acceptor_residues = []
+    nb_contacts = []
+    max_atoms_dist = []
+    contacts_ids = []
+    for donor_position in sorted(list(set(df_not_unique["donor position"]))):
+        df_donors = df_not_unique[df_not_unique["donor position"] == donor_position]
+        for acceptor_position in sorted(list(set(df_donors["acceptor position"]))):
+            df_acceptors = df_donors[df_donors["acceptor position"] == acceptor_position]
+            donor_positions.append(donor_position)
+            donor_residues.append(df_donors["donor residue"].iloc[0])
+            acceptor_positions.append(acceptor_position)
+            acceptor_residues.append(df_acceptors["acceptor residue"].iloc[0])
+            nb_contacts.append(len(df_acceptors))
+            max_atoms_dist.append(max(df_acceptors[col]))
+            pair_contacts_ids = []
+            for _, row in df_acceptors.iterrows():
+                pair_contacts_ids.append(row["contact"])
+            contacts_ids.append(" | ".join(pair_contacts_ids))
+
+    df_uniques = pd.DataFrame.from_dict({"donor positions": donor_positions,
+                                         "donor residues": donor_residues,
+                                         "acceptor positions": acceptor_positions,
+                                         "acceptor residues": acceptor_residues,
+                                         "atoms contacts": nb_contacts,
+                                         "maximum atoms distance": max_atoms_dist,
+                                         "contacts ID": contacts_ids})
+    return df_uniques
+
+
+def outliers_contacts(df, res_dist_thr, col_dist):
+    """
+    Get the residues pairs contacts above the residues distance contacts, meaning contacts of distant residues.
+
+    :param df: the dataframe of contacts.
+    :type df: pd.Dataframe
+    :param res_dist_thr: the residues distance threshold.
+    :type res_dist_thr: int
+    :param col_dist: the atoms distances column name.
+    :type col_dist: str
+    the dataframe of unique residues pairs contacts.
+    :rtype: pd.Dataframe
+    """
+    idx_to_remove_for_residue_distance = []
     for idx, row in df.iterrows():
-        if abs(row["donor position"] - row["acceptor position"]) < thr:
-            idx_to_remove.append(idx)
+        if abs(row["donor position"] - row["acceptor position"]) < res_dist_thr:
+            idx_to_remove_for_residue_distance.append(idx)
     # remove rows with too close distance between the residues
-    df.drop(idx_to_remove, inplace=True, axis=0)
+    df.drop(idx_to_remove_for_residue_distance, inplace=True, axis=0)
+    logging.debug(f"{len(df)} atoms contacts remaining with a minimal residues distance threshold of {res_dist_thr}.")
     # reduce to one row when more than one atom per residue
-    return df
+    unique = unique_residues_pairs(df, col_dist)
+
+    return unique
+
+
+def get_outliers_regions(df, bed):
+    """"""
+    for _, row in df.iterrows():
+        sys.exit()
+
 
 
 if __name__ == "__main__":
@@ -183,15 +246,16 @@ if __name__ == "__main__":
     create_log(args.log, args.log_level, args.out)
 
     # load the BED file
-    bed = pd.read_csv(args.bed, sep="\t", header=None, names=["id", "start", "stop", "region"])
-    print(bed)
+    bed_data = pd.read_csv(args.bed, sep="\t", header=None, names=["id", "start", "stop", "region"])
+    print(bed_data)
 
     contacts = extract_contacts_with_atoms_distance(args.input, args.roi, args.col_distance, args.atoms_distance)
-    print(contacts)
-    contacts.to_csv(os.path.join(args.out, "filtered_contacts_HEPAC-26_RPL6_ORF1_0.csv"))
 
     outliers = outliers_contacts(contacts, args.residues_distance, args.col_distance)
-    print(outliers)
+    logging.info(f"{len(outliers)} unique residues pairs contacts (<= {args.atoms_distance} \u212B) with a distance of "
+                 f"at least {args.residues_distance} "
+                 f"residues{' in the region of interest '+args.roi if args.roi else ''} (residues pair may have "
+                 f"multiple atoms contacts).")
+    outliers.to_csv(os.path.join(args.out, "outliers_contacts_HEPAC-26_RPL6_ORF1_0.csv"))
 
-
-
+    outliers = get_outliers_regions(outliers, bed_data)
