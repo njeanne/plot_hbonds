@@ -55,6 +55,41 @@ def create_log(log_path, level, out_dir):
     logging.info(f"CMD: {' '.join(sys.argv)}")
 
 
+def extract_bed(bed_path):
+    """
+    Load the BED file and fill in regions that are not covered.
+
+    :param bed_path: the path to the BED file.
+    :type bed_path: str
+    :return: the filled-in BED.
+    :rtype: pd.Dataframe
+    """
+    raw = pd.read_csv(bed_path, sep="\t", header=None, names=["id", "start", "stop", "region"])
+    data = {"id": [], "start": [], "stop": [], "region": []}
+    pos_start = 1
+    previous_region = None
+    for idx, row in raw.iterrows():
+        if pos_start < row["start"]:  # not in region
+            # record the undefined region
+            data["id"].append(row["id"])
+            data["start"].append(pos_start)
+            data["stop"].append(row["start"] - 1)
+            if idx == 0:  # before first region
+                data["region"].append(f"before {row['region']}")
+            else:
+                data["region"].append(f"between {previous_region} and {row['region']}")
+        # record the region in the BED
+        data["id"].append(row["id"])
+        data["start"].append(row["start"])
+        data["stop"].append(row["stop"])
+        data["region"].append(row["region"])
+        pos_start = row["stop"] + 1
+        previous_region = row["region"]
+
+    df = pd.DataFrame(data)
+    return df
+
+
 def extract_roi(roi_to_extract):
     """Extract the start and stop coordinates of the region of interest (roi).
 
