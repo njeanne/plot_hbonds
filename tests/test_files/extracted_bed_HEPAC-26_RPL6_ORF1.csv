@@ -1,0 +1,13 @@
+,id,start,stop,region
+0,HEPAC-26_RPL6_ORF1,1,59,before Methyltransferase
+1,HEPAC-26_RPL6_ORF1,60,238,Methyltransferase
+2,HEPAC-26_RPL6_ORF1,239,439,Y domain
+3,HEPAC-26_RPL6_ORF1,440,610,Protease
+4,HEPAC-26_RPL6_ORF1,611,681,between Protease and Hinge
+5,HEPAC-26_RPL6_ORF1,682,838,Hinge
+6,HEPAC-26_RPL6_ORF1,839,844,between Hinge and Helicase
+7,HEPAC-26_RPL6_ORF1,845,1002,Helicase
+8,HEPAC-26_RPL6_ORF1,1003,1019,between Helicase and RdRp
+9,HEPAC-26_RPL6_ORF1,1020,1264,RdRp
+10,HEPAC-26_RPL6_ORF1,1265,1266,between RdRp and X domain
+11,HEPAC-26_RPL6_ORF1,1267,1753,X domain
