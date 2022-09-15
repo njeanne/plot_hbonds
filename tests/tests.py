@@ -7,7 +7,6 @@ __email__ = 'jeanne.n@chu-toulouse.fr'
 
 import argparse
 import os
-import re
 import shutil
 import sys
 import tempfile
@@ -79,8 +78,10 @@ class TestTrajectoriesOutliersContacts(unittest.TestCase):
         assert_frame_equal(self.expected_outliers_contacts, observed)
 
     def test_update_regions(self):
-        observed = update_regions(self.expected_outliers_contacts, self.extracted_bed)
+        observed_path = os.path.join(self.tmp_dir, str(uuid.uuid1()))
+        observed = update_regions(self.expected_outliers_contacts, self.extracted_bed, observed_path)
         assert_frame_equal(self.expected_regions_contacts, observed)
+        assert_frame_equal(self.expected_regions_contacts, pd.read_csv(observed_path))
 
 
 if __name__ == '__main__':
