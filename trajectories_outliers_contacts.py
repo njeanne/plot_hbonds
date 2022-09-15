@@ -96,23 +96,13 @@ def extract_contacts_with_atoms_distance(path_contacts, roi_str, col, thr):
     # select the donors region of interest if any
     roi_text = ""
     if roi_str:
-        try:
-            roi = extract_roi(roi_str)
-            # reduce to the donors region of interest limits
-            df = df[df["donor position"].between(roi[0], roi[1])]
-            logging.debug(f"{len(df)} atoms contacts in the region of interest.")
-            roi_text = f" in the donors region of interest {roi_str}"
-        except argparse.ArgumentTypeError as exc:
-            logging.error(exc, exc_info=True)
-            sys.exit(1)
-    try:
-        df = df[df[col] <= thr]
-    except KeyError as exc:
-        logging.error(f"\"{col}\" column name does not exists in the CSV file.", exc_info=True)
-        sys.exit(1)
-    except TypeError as exc:
-        logging.error(f"\"{col}\" column name may refers to a column that is not an atoms distances.", exc_info=True)
-        sys.exit(1)
+        roi = extract_roi(roi_str)
+        # reduce to the donors region of interest limits
+        df = df[df["donor position"].between(roi[0], roi[1])]
+        logging.debug(f"{len(df)} atoms contacts in the region of interest.")
+        roi_text = f" in the donors region of interest {roi_str}"
+
+    df = df[df[col] <= thr]
     logging.debug(f"{len(df)} atoms contacts detected{roi_text} for a maximal contacts distance of {thr} \u212B on "
                   f"column \"{col.replace('_', ' ')}\".")
     return df
@@ -171,7 +161,7 @@ def outliers_contacts(df, res_dist_thr, col_dist):
     :type res_dist_thr: int
     :param col_dist: the atoms distances column name.
     :type col_dist: str
-    the dataframe of unique residues pairs contacts.
+    :return: the dataframe of unique residues pairs contacts.
     :rtype: pd.Dataframe
     """
     idx_to_remove_for_residue_distance = []
@@ -245,17 +235,38 @@ if __name__ == "__main__":
     # create the logger
     create_log(args.log, args.log_level, args.out)
 
-    # load the BED file
-    bed_data = pd.read_csv(args.bed, sep="\t", header=None, names=["id", "start", "stop", "region"])
+    # load and format the BED file
+    bed_data = extract_bed(args.bed)
     print(bed_data)
 
-    contacts = extract_contacts_with_atoms_distance(args.input, args.roi, args.col_distance, args.atoms_distance)
-
+    # extract the contacts
+    try:
+        contacts = extract_contacts_with_atoms_distance(args.input, args.roi, args.col_distance, args.atoms_distance)
+    except argparse.ArgumentTypeError as exc:
+        logging.error(exc, exc_info=True)
+        sys.exit(1)
+    except KeyError as exc:
+        logging.error(f"\"{args.col_distance}\" column name does not exists in the CSV file.", exc_info=True)
+        sys.exit(1)
+    except TypeError as exc:
+        logging.error(f"\"{args.col_distance}\" column name may refers to a column that is not an atoms distances.",
+                      exc_info=True)
+        sys.exit(1)
     outliers = outliers_contacts(contacts, args.residues_distance, args.col_distance)
     logging.info(f"{len(outliers)} unique residues pairs contacts (<= {args.atoms_distance} \u212B) with a distance of "
                  f"at least {args.residues_distance} "
                  f"residues{' in the region of interest '+args.roi if args.roi else ''} (residues pair may have "
                  f"multiple atoms contacts).")
-    outliers.to_csv(os.path.join(args.out, "outliers_contacts_HEPAC-26_RPL6_ORF1_0.csv"))
 
-    outliers = get_outliers_regions(outliers, bed_data)
+    # get the outliers contacts
+    outliers = update_regions(outliers, bed_data)
+    outliers_path = os.path.join(args.out, f"outliers_{os.path.splitext(os.path.basename(args.input))[0]}.csv")
+    outliers.to_csv(outliers_path, index=False)
+    logging.info(f"Pairs residues contacts updated with regions saved: {outliers_path}")
+    print(outliers)
+
+    # by acceptor region
+    regions = acceptors_regions_involved(outliers, bed_data)
+
+
+    # regions_contacts.to_csv(os.path.join(args.out, "regions_contacts_HEPAC-26_RPL6_ORF1_0.csv"))
