@@ -208,11 +208,10 @@ def outliers_contacts(df, res_dist_thr, col_dist):
     logging.debug(f"{len(df)} atoms contacts remaining with a minimal residues distance threshold of {res_dist_thr}.")
     # reduce to one row when more than one atom per residue
     unique = unique_residues_pairs(df, col_dist)
-
     return unique
 
 
-def update_regions(df, bed):
+def update_regions(df, bed, path):
     """
     Get the regions for pairs acceptor and donor.
 
@@ -220,6 +219,8 @@ def update_regions(df, bed):
     :type df: pd.Dataframe
     :param bed: the regions in BED format.
     :type bed: pd.Dataframe
+    :param path: the path of the outliers contacts updated with the regions CSV file.
+    :type path: str
     :return: the pairs contacts dataframe updated with the regions.
     :rtype: pd.Dataframe
     """
@@ -233,12 +234,52 @@ def update_regions(df, bed):
                 acceptors_regions[idx] = row_bed["region"]
     df.insert(2, "donor regions", pd.DataFrame(donors_regions))
     df.insert(5, "acceptor regions", pd.DataFrame(acceptors_regions))
+    df.to_csv(path, index=False)
+    logging.info(f"Pairs residues contacts updated with regions saved: {path}")
     return df
 
 
-def acceptors_regions_involved(df, bed):
-    """"""
+def acceptors_regions_involved(df, bed, path, roi, atoms_dist, res_dist):
+    """
+    Create the plot of contacts by regions.
+
+    :param df: the dataframe.
+    :type df: pd.Dataframe
+    :param bed: the regions BED file.
+    :type bed: pd.Dataframe
+    :param path: the path of the output plot.
+    :type path: str
+    :param roi: the region of interest.
+    :type roi: str
+    :param atoms_dist: the maximal atoms distance contact.
+    :type atoms_dist: str
+    :param res_dist: the maximal residues distance in the amino acids chain.
+    :type res_dist: int
+    """
     data = {}
+    for _, row_bed in bed.iterrows():
+        tmp = df[df["acceptor regions"] == row_bed["region"]]
+        if not tmp.empty:
+            if not row_bed["region"] in data:
+                data[row_bed["region"]] = 0
+            for _, row_tmp in tmp.iterrows():
+                data[row_bed["region"]] += row_tmp["atoms contacts"]
+    source = pd.DataFrame.from_dict({"region": data.keys(), "number of contacts": data.values()})
+
+    # set the seaborn plots style and size
+    sns.set_style("darkgrid")
+    sns.set_context("poster", rc={"grid.linewidth": 2})
+    fig, ax = plt.subplots(figsize=(15, 15))
+    sns.barplot(data=source, ax=ax, x="region", y="number of contacts", color="blue")
+    ax.set_xticklabels(source["region"], rotation=45, horizontalalignment="right")
+    ax.set_xlabel(None)
+    ax.set_ylabel("Number of contacts", fontweight="bold")
+    ax.text(x=0.5, y=1.1, s=f"Outliers contacts by regions{' (region of interest ' + roi + ')' if roi else ''}",
+            weight="bold", ha="center", va="bottom", transform=ax.transAxes)
+    ax.text(x=0.5, y=1.05, s=f"Maximal atoms distance: {atoms_dist} \u212B, maximal residues distance: {res_dist}",
+            alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
+    fig.savefig(path, bbox_inches="tight")
+    logging.info(f"Contacts by region plot saved: {path}")
 
 
 if __name__ == "__main__":
@@ -292,9 +333,10 @@ if __name__ == "__main__":
     # create the logger
     create_log(args.log, args.log_level, args.out)
 
+    # get the input basename
+    basename = os.path.splitext(os.path.basename(args.input))[0]
     # load and format the BED file
     bed_data = extract_bed(args.bed)
-    print(bed_data)
 
     # extract the contacts
     try:
@@ -316,14 +358,8 @@ if __name__ == "__main__":
                  f"multiple atoms contacts).")
 
     # get the outliers contacts
-    outliers = update_regions(outliers, bed_data)
-    outliers_path = os.path.join(args.out, f"outliers_{os.path.splitext(os.path.basename(args.input))[0]}.csv")
-    outliers.to_csv(outliers_path, index=False)
-    logging.info(f"Pairs residues contacts updated with regions saved: {outliers_path}")
-    print(outliers)
+    outliers = update_regions(outliers, bed_data, os.path.join(args.out, f"outliers_{basename}.csv"))
 
     # by acceptor region
-    regions = acceptors_regions_involved(outliers, bed_data)
-
-
-    # regions_contacts.to_csv(os.path.join(args.out, "regions_contacts_HEPAC-26_RPL6_ORF1_0.csv"))
+    acceptors_regions_involved(outliers, bed_data, os.path.join(args.out, f"regions_{basename}.{args.format}"),
+                               args.roi, args.atoms_distance, args.residues_distance)
