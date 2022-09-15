@@ -212,11 +212,33 @@ def outliers_contacts(df, res_dist_thr, col_dist):
     return unique
 
 
-def get_outliers_regions(df, bed):
-    """"""
-    for _, row in df.iterrows():
-        sys.exit()
+def update_regions(df, bed):
+    """
+    Get the regions for pairs acceptor and donor.
 
+    :param df: the dataframe of unique residues pairs contacts.
+    :type df: pd.Dataframe
+    :param bed: the regions in BED format.
+    :type bed: pd.Dataframe
+    :return: the pairs contacts dataframe updated with the regions.
+    :rtype: pd.Dataframe
+    """
+    donors_regions = [None] * len(df)
+    acceptors_regions = [None] * len(df)
+    for idx, row_contacts in df.iterrows():
+        for _, row_bed in bed.iterrows():
+            if row_bed["start"] <= row_contacts["donor positions"] <= row_bed["stop"]:
+                donors_regions[idx] = row_bed["region"]
+            if row_bed["start"] <= row_contacts["acceptor positions"] <= row_bed["stop"]:
+                acceptors_regions[idx] = row_bed["region"]
+    df.insert(2, "donor regions", pd.DataFrame(donors_regions))
+    df.insert(5, "acceptor regions", pd.DataFrame(acceptors_regions))
+    return df
+
+
+def acceptors_regions_involved(df, bed):
+    """"""
+    data = {}
 
 
 if __name__ == "__main__":
