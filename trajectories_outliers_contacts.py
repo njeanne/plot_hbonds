@@ -17,7 +17,7 @@ import sys
 
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib import rcParams
+import matplotlib.ticker as ticker
 import seaborn as sns
 
 
@@ -239,7 +239,7 @@ def update_regions(df, bed, path):
     return df
 
 
-def acceptors_regions_involved(df, bed, path, roi, atoms_dist, res_dist):
+def acceptors_regions_involved(df, bed, out_dir, bn, roi, atoms_dist, res_dist, fmt):
     """
     Create the plot of contacts by regions.
 
@@ -247,14 +247,18 @@ def acceptors_regions_involved(df, bed, path, roi, atoms_dist, res_dist):
     :type df: pd.Dataframe
     :param bed: the regions BED file.
     :type bed: pd.Dataframe
-    :param path: the path of the output plot.
-    :type path: str
+    :param out_dir: the path of the output directory.
+    :type out_dir: str
+    :param bn: basename for the sample.
+    :type bn: str
     :param roi: the region of interest.
     :type roi: str
     :param atoms_dist: the maximal atoms distance contact.
     :type atoms_dist: str
     :param res_dist: the maximal residues distance in the amino acids chain.
     :type res_dist: int
+    :param fmt: the format for the plot.
+    :type fmt: str
     """
     data = {}
     for _, row_bed in bed.iterrows():
@@ -274,10 +278,12 @@ def acceptors_regions_involved(df, bed, path, roi, atoms_dist, res_dist):
     ax.set_xticklabels(source["region"], rotation=45, horizontalalignment="right")
     ax.set_xlabel(None)
     ax.set_ylabel("Number of contacts", fontweight="bold")
-    ax.text(x=0.5, y=1.1, s=f"Outliers contacts by regions{' (region of interest ' + roi + ')' if roi else ''}",
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+    ax.text(x=0.5, y=1.1, s=f"{bn}: outliers contacts by regions{' (region of interest ' + roi + ')' if roi else ''}",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
     ax.text(x=0.5, y=1.05, s=f"Maximal atoms distance: {atoms_dist} \u212B, maximal residues distance: {res_dist}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
+    path = os.path.join(out_dir, f"regions_{bn}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
     logging.info(f"Contacts by region plot saved: {path}")
 
@@ -361,5 +367,5 @@ if __name__ == "__main__":
     outliers = update_regions(outliers, bed_data, os.path.join(args.out, f"outliers_{basename}.csv"))
 
     # by acceptor region
-    acceptors_regions_involved(outliers, bed_data, os.path.join(args.out, f"regions_{basename}.{args.format}"),
-                               args.roi, args.atoms_distance, args.residues_distance)
+    acceptors_regions_involved(outliers, bed_data, args.out, basename, args.roi, args.atoms_distance,
+                               args.residues_distance, args.format)
