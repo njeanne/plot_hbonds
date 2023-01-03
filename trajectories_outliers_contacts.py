@@ -55,36 +55,36 @@ def create_log(log_path, level, out_dir):
     logging.info(f"CMD: {' '.join(sys.argv)}")
 
 
-def extract_bed(bed_path):
+def extract_domains(domains_path):
     """
-    Load the BED file and fill in regions that are not covered.
+    Load the domains file and fill in domains that are not covered.
 
-    :param bed_path: the path to the BED file.
-    :type bed_path: str
+    :param domains_path: the path to the domains file.
+    :type domains_path: str
     :return: the filled-in BED.
     :rtype: pd.Dataframe
     """
-    raw = pd.read_csv(bed_path, sep="\t", header=None, names=["id", "start", "stop", "region"])
-    data = {"id": [], "start": [], "stop": [], "region": []}
+    raw = pd.read_csv(domains_path, sep=",", header=0, names=["domain", "start", "stop", "color"])
+    data = {"domain": [], "start": [], "stop": [], "color": []}
     pos_start = 1
     previous_region = None
     for idx, row in raw.iterrows():
-        if pos_start < row["start"]:  # not in region
-            # record the undefined region
-            data["id"].append(row["id"])
+        if pos_start < row["start"]:  # not in domain
+            # record the undefined domain
             data["start"].append(pos_start)
             data["stop"].append(row["start"] - 1)
-            if idx == 0:  # before first region
-                data["region"].append(f"before {row['region']}")
+            data["color"].append(row["color"])
+            if idx == 0:  # before first domain
+                data["domain"].append(f"before {row['domain']}")
             else:
-                data["region"].append(f"between {previous_region} and {row['region']}")
-        # record the region in the BED
-        data["id"].append(row["id"])
+                data["domain"].append(f"between {previous_region} and {row['domain']}")
+        # record the domain in the BED
+        data["domain"].append(row["domain"])
         data["start"].append(row["start"])
         data["stop"].append(row["stop"])
-        data["region"].append(row["region"])
+        data["color"].append(row["color"])
         pos_start = row["stop"] + 1
-        previous_region = row["region"]
+        previous_region = row["domain"]
 
     df = pd.DataFrame(data)
     return df
@@ -211,13 +211,13 @@ def outliers_contacts(df, res_dist_thr, col_dist):
     return unique
 
 
-def update_regions(df, bed, path):
+def update_domains(df, bed, path):
     """
-    Get the regions for pairs acceptor and donor.
+    Get the domains for pairs acceptor and donor.
 
     :param df: the dataframe of unique residues pairs contacts.
     :type df: pd.Dataframe
-    :param bed: the regions in BED format.
+    :param bed: the domains.
     :type bed: pd.Dataframe
     :param path: the path of the outliers contacts updated with the regions CSV file.
     :type path: str
@@ -227,26 +227,26 @@ def update_regions(df, bed, path):
     donors_regions = [None] * len(df)
     acceptors_regions = [None] * len(df)
     for idx, row_contacts in df.iterrows():
-        for _, row_bed in bed.iterrows():
-            if row_bed["start"] <= row_contacts["donor positions"] <= row_bed["stop"]:
-                donors_regions[idx] = row_bed["region"]
-            if row_bed["start"] <= row_contacts["acceptor positions"] <= row_bed["stop"]:
-                acceptors_regions[idx] = row_bed["region"]
-    df.insert(2, "donor regions", pd.DataFrame(donors_regions))
-    df.insert(5, "acceptor regions", pd.DataFrame(acceptors_regions))
+        for _, row_domains in bed.iterrows():
+            if row_domains["start"] <= row_contacts["donor positions"] <= row_domains["stop"]:
+                donors_regions[idx] = row_domains["domain"]
+            if row_domains["start"] <= row_contacts["acceptor positions"] <= row_domains["stop"]:
+                acceptors_regions[idx] = row_domains["domain"]
+    df.insert(2, "donor domains", pd.DataFrame(donors_regions))
+    df.insert(5, "acceptor domains", pd.DataFrame(acceptors_regions))
     df.to_csv(path, index=False)
-    logging.info(f"Pairs residues contacts updated with regions saved: {path}")
+    logging.info(f"Pairs residues contacts updated with domains saved: {path}")
     return df
 
 
-def acceptors_regions_involved(df, bed, out_dir, bn, roi, atoms_dist, res_dist, fmt):
+def acceptors_domains_involved(df, domains, out_dir, bn, roi, atoms_dist, res_dist, fmt):
     """
     Create the plot of contacts by regions.
 
     :param df: the dataframe.
     :type df: pd.Dataframe
-    :param bed: the regions BED file.
-    :type bed: pd.Dataframe
+    :param domains: the domains.
+    :type domains: pd.Dataframe
     :param out_dir: the path of the output directory.
     :type out_dir: str
     :param bn: basename for the sample.
@@ -261,21 +261,21 @@ def acceptors_regions_involved(df, bed, out_dir, bn, roi, atoms_dist, res_dist, 
     :type fmt: str
     """
     data = {}
-    for _, row_bed in bed.iterrows():
-        tmp = df[df["acceptor regions"] == row_bed["region"]]
+    for _, row_domains in domains.iterrows():
+        tmp = df[df["acceptor domains"] == row_domains["domain"]]
         if not tmp.empty:
-            if not row_bed["region"] in data:
-                data[row_bed["region"]] = 0
+            if not row_domains["domain"] in data:
+                data[row_domains["domain"]] = 0
             for _, row_tmp in tmp.iterrows():
-                data[row_bed["region"]] += row_tmp["atoms contacts"]
-    source = pd.DataFrame.from_dict({"region": data.keys(), "number of contacts": data.values()})
+                data[row_domains["domain"]] += row_tmp["atoms contacts"]
+    source = pd.DataFrame.from_dict({"domain": data.keys(), "number of contacts": data.values()})
 
     # set the seaborn plots style and size
     sns.set_style("darkgrid")
     sns.set_context("poster", rc={"grid.linewidth": 2})
     fig, ax = plt.subplots(figsize=(15, 15))
-    sns.barplot(data=source, ax=ax, x="region", y="number of contacts", color="blue")
-    ax.set_xticklabels(source["region"], rotation=45, horizontalalignment="right")
+    sns.barplot(data=source, ax=ax, x="domain", y="number of contacts", color="blue")
+    ax.set_xticklabels(source["domain"], rotation=45, horizontalalignment="right")
     ax.set_xlabel(None)
     ax.set_ylabel("Number of contacts", fontweight="bold")
     ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
@@ -283,9 +283,9 @@ def acceptors_regions_involved(df, bed, out_dir, bn, roi, atoms_dist, res_dist, 
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
     ax.text(x=0.5, y=1.05, s=f"Maximal atoms distance: {atoms_dist} \u212B, maximal residues distance: {res_dist}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
-    path = os.path.join(out_dir, f"regions_{bn}.{fmt}")
+    path = os.path.join(out_dir, f"domains_{bn}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
-    logging.info(f"Contacts by region plot saved: {path}")
+    logging.info(f"Contacts by domain plot saved: {path}")
 
 
 if __name__ == "__main__":
@@ -300,13 +300,16 @@ if __name__ == "__main__":
 
     From a CSV of the amino acids contacts file produced by the script trajectories
     (https://github.com/njeanne/trajectories), extract the information of the contacts outside the neighbourhood 
-    contacts of an amino acid and determine to which region the acceptor amino acid belongs to using a BED file 
+    contacts of an amino acid and determine to which domain the acceptor amino acid belongs to using a BED file 
     registering the domains.
     """
     parser = argparse.ArgumentParser(description=descr, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-o", "--out", required=True, type=str, help="the path to the output directory.")
-    parser.add_argument("-b", "--bed", required=True, type=str,
-                        help="the path to the BED file registering the amino acids regions positions.")
+    parser.add_argument("-d", "--domains", required=False, type=str, default="",
+                        help="the path to the CSV domains file. A comma separated file, the first column is the "
+                             "annotation name, the 2nd is the residue start coordinate, the 3rd is the residue end "
+                             "coordinate, the last one is the color to apply in hexadecimal format. The coordinate are "
+                             "1-indexed.")
     parser.add_argument("-c", "--col-distance", required=True, type=str,
                         help="the name of the column to use for the atoms distances.")
     parser.add_argument("-i", "--roi", required=False, type=str,
@@ -342,7 +345,7 @@ if __name__ == "__main__":
     # get the input basename
     basename = os.path.splitext(os.path.basename(args.input))[0]
     # load and format the BED file
-    bed_data = extract_bed(args.bed)
+    domains_data = extract_domains(args.domains)
 
     # extract the contacts
     try:
@@ -364,8 +367,8 @@ if __name__ == "__main__":
                  f"multiple atoms contacts).")
 
     # get the outliers contacts
-    outliers = update_regions(outliers, bed_data, os.path.join(args.out, f"outliers_{basename}.csv"))
+    outliers = update_domains(outliers, domains_data, os.path.join(args.out, f"outliers_{basename}.csv"))
 
-    # by acceptor region
-    acceptors_regions_involved(outliers, bed_data, args.out, basename, args.roi, args.atoms_distance,
+    # by acceptor domain
+    acceptors_domains_involved(outliers, domains_data, args.out, basename, args.roi, args.atoms_distance,
                                args.residues_distance, args.format)
