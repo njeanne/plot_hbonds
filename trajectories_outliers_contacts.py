@@ -283,7 +283,7 @@ def acceptors_domains_involved(df, domains, out_dir, bn, roi, atoms_dist, res_di
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
     ax.text(x=0.5, y=1.05, s=f"Maximal atoms distance: {atoms_dist} \u212B, maximal residues distance: {res_dist}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
-    path = os.path.join(out_dir, f"domains_{bn}.{fmt}")
+    path = os.path.join(out_dir, f"outliers_{bn}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
     logging.info(f"Contacts by domain plot saved: {path}")
 
