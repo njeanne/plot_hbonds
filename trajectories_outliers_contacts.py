@@ -211,15 +211,15 @@ def outliers_contacts(df, res_dist_thr, col_dist):
     return unique
 
 
-def update_domains(df, bed, path):
+def update_domains(df, domains, path):
     """
     Get the domains for pairs acceptor and donor.
 
     :param df: the dataframe of unique residues pairs contacts.
     :type df: pd.Dataframe
-    :param bed: the domains.
-    :type bed: pd.Dataframe
-    :param path: the path of the outliers contacts updated with the regions CSV file.
+    :param domains: the domains coordinates.
+    :type domains: pd.Dataframe
+    :param path: the path of the outliers contacts updated with the domains CSV file.
     :type path: str
     :return: the pairs contacts dataframe updated with the regions.
     :rtype: pd.Dataframe
@@ -227,7 +227,7 @@ def update_domains(df, bed, path):
     donors_regions = [None] * len(df)
     acceptors_regions = [None] * len(df)
     for idx, row_contacts in df.iterrows():
-        for _, row_domains in bed.iterrows():
+        for _, row_domains in domains.iterrows():
             if row_domains["start"] <= row_contacts["donor positions"] <= row_domains["stop"]:
                 donors_regions[idx] = row_domains["domain"]
             if row_domains["start"] <= row_contacts["acceptor positions"] <= row_domains["stop"]:
@@ -279,7 +279,7 @@ def acceptors_domains_involved(df, domains, out_dir, bn, roi, atoms_dist, res_di
     ax.set_xlabel(None)
     ax.set_ylabel("Number of contacts", fontweight="bold")
     ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
-    ax.text(x=0.5, y=1.1, s=f"{bn}: outliers contacts by regions{' (region of interest ' + roi + ')' if roi else ''}",
+    ax.text(x=0.5, y=1.1, s=f"{bn}: outliers contacts by domains{' (region of interest ' + roi + ')' if roi else ''}",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
     ax.text(x=0.5, y=1.05, s=f"Maximal atoms distance: {atoms_dist} \u212B, maximal residues distance: {res_dist}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
