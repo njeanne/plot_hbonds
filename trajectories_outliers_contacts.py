@@ -210,15 +210,18 @@ def extract_residues_contacts(path_contacts, roi):
     return df_residues_contacts
 
 
-def get_df_distances_nb_contacts(df):
+def get_df_distances_nb_contacts(df, roi):
     """
     Create a distances and a number of contacts dataframes for the couples donors and acceptors.
 
     :param df: the initial dataframe
     :type df: pd.Dataframe
+    :param roi: the Region Of Interest (ROI) limits for the heatmap Y axis.
+    :type roi: list
     :return: the dataframe of distances and the dataframe of the number of contacts.
     :rtype: pd.Dataframe, pd.Dataframe
     """
+
     # create the dictionaries of distances and number of contacts
     distances = {}
     nb_contacts = {}
@@ -247,16 +250,20 @@ def get_df_distances_nb_contacts(df):
             # get the number of contacts
             if acceptor_position not in nb_contacts:
                 nb_contacts[acceptor_position] = []
-            contacts_found = df.loc[(df["donor position"] == donor_position) & (
-                        df["acceptor position"] == acceptor_position), "number contacts"]
-            if not contacts_found.empty:
-                nb_contacts[acceptor_position].append(contacts_found.values[0])
+            contacts = df.loc[(df["donor position"] == donor_position) & (df["acceptor position"] == acceptor_position),
+                              "number contacts"]
+            if not contacts.empty:
+                nb_contacts[acceptor_position].append(contacts.values[0])
             else:
                 nb_contacts[acceptor_position].append(None)
     source_distances = pd.DataFrame(distances, index=donors)
     source_distances.columns = acceptors
+    # todo: remove
+    source_distances.to_csv("/home/jeanne_n/dev/trajectories_outliers_contacts/results/HEPAC-6_RNF19A_ORF1_0/distances.csv")
     source_nb_contacts = pd.DataFrame(nb_contacts, index=donors)
     source_nb_contacts.columns = acceptors
+    # todo: remove
+    source_nb_contacts.to_csv("/home/jeanne_n/dev/trajectories_outliers_contacts/results/HEPAC-6_RNF19A_ORF1_0/nb_contacts.csv")
     return source_distances, source_nb_contacts
 
 
@@ -278,7 +285,7 @@ def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
     :type lim_roi: list
     """
     # create the distances and number of contacts dataframes to produce the heatmap
-    source_distances, source_nb_contacts = get_df_distances_nb_contacts(contacts)
+    source_distances, source_nb_contacts = get_df_distances_nb_contacts(contacts, lim_roi)
 
     # increase the size of the heatmap if too much entries
     factor = int(len(source_distances) / 40) if len(source_distances) / 40 >= 1 else 1
@@ -293,7 +300,7 @@ def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
     plt.suptitle(title, fontsize="large", fontweight="bold")
     subtitle = "Number of residues atoms in contact are displayed in the squares."
     if lim_roi:
-        subtitle = f"{subtitle}\nHeatmap focus on donor residues {lim_roi[0]} to {lim_roi[1]}"
+        subtitle = f"{subtitle}\nHeatmap focus on residues {lim_roi[0]} to {lim_roi[1]}"
     if params["frames"]:
         subtitle = f"{subtitle}\nMolecular Dynamics frames used: {params['frames']['min']} to {params['frames']['max']}"
     plt.title(subtitle)
@@ -538,7 +545,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # get the heatmaps of validated contacts by residues
-    heatmap_contacts(residues_contacts, parameters_contacts_analysis, args.out, basename, args.format, roi_limits)
+    heatmap_contacts(residues_contacts, parameters_contacts_analysis, basename, args.out, args.format, roi_limits)
     sys.exit()
 
     outliers = outliers_contacts(contacts, args.residues_distance, args.col_distance)
