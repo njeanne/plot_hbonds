@@ -15,7 +15,7 @@ import uuid
 
 import pandas as pd
 from pandas.testing import assert_frame_equal
-from trajectories_outliers_contacts import extract_bed, extract_roi, extract_contacts_with_atoms_distance, \
+from trajectories_outliers_contacts import extract_bed, extract_roi, extract_residues_contacts, \
     outliers_contacts, update_regions
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -63,15 +63,15 @@ class TestTrajectoriesOutliersContacts(unittest.TestCase):
         self.assertListEqual([682, 838], observed)
 
     def test_extract_contacts_with_atoms_distance(self):
-        observed = extract_contacts_with_atoms_distance(self.input_contacts, self.roi, self.col_distance,
-                                                        self.atoms_dist)
+        observed = extract_residues_contacts(self.input_contacts, self.roi, self.col_distance,
+                                             self.atoms_dist)
         assert_frame_equal(self.expected_filtered_contacts, observed)
         with self.assertRaises(argparse.ArgumentTypeError):
-            extract_contacts_with_atoms_distance(self.input_contacts, "422", self.col_distance, self.atoms_dist)
+            extract_residues_contacts(self.input_contacts, "422", self.col_distance, self.atoms_dist)
         with self.assertRaises(KeyError):
-            extract_contacts_with_atoms_distance(self.input_contacts, "682-838", "toto", self.atoms_dist)
+            extract_residues_contacts(self.input_contacts, "682-838", "toto", self.atoms_dist)
         with self.assertRaises(TypeError):
-            extract_contacts_with_atoms_distance(self.input_contacts, "682-838", "donor residue", self.atoms_dist)
+            extract_residues_contacts(self.input_contacts, "682-838", "donor residue", self.atoms_dist)
 
     def test_outliers_contacts(self):
         observed = outliers_contacts(self.expected_filtered_contacts, self.residues_dist, self.col_distance)
