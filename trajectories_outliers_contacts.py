@@ -7,7 +7,7 @@ Created on 12 Sep. 2022
 __author__ = "Nicolas JEANNE"
 __copyright__ = "GNU General Public License"
 __email__ = "jeanne.n@chu-toulouse.fr"
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 import argparse
 import logging
@@ -134,38 +134,176 @@ def extract_roi(roi_to_extract):
     return roi_extracted
 
 
-def extract_contacts_with_atoms_distance(path_contacts, roi_str, col, thr):
+def get_residues_in_contact(df):
     """
-    Extract the contacts from the CSV file residues contacts and filter on the donor region of interest (if any) and on
-    the threshold of the contacts distance column.
+    Reduce the contacts to residues, if 2 residues have multiple atoms in contacts, the pair of atoms with the smallest
+    distance will be kept, then create a column with the number of contacts between this 2 residues and finally sort
+    the data by position of the donors.
+
+    :param df: the contacts from the trajectory analysis.
+    :type df: pandas.Dataframe
+    :return: the reduced dataframe with the minimal distance value of all the couples of donors-acceptors and the
+    column with the number of contacts.
+    :rtype: pd.Dataframe
+    """
+    # convert the donor and acceptor positions columns to int
+    df["donor position"] = pd.to_numeric(df["donor position"])
+    df["acceptor position"] = pd.to_numeric(df["acceptor position"])
+    # donors_acceptors is used to register the combination of donor and acceptor and select only the value with the
+    # minimal contact distance and also the number of contacts
+    donors_acceptors = []
+    idx_to_remove = []
+    donor_acceptor_nb_contacts = []
+    for _, row in df.iterrows():
+        donor = f"{row['donor position']}{row['donor residue']}"
+        acceptor = f"{row['acceptor position']}{row['acceptor residue']}"
+        if f"{donor}_{acceptor}" not in donors_acceptors:
+            donors_acceptors.append(f"{donor}_{acceptor}")
+            tmp_df = df[
+                (df["donor position"] == row["donor position"]) & (df["acceptor position"] == row["acceptor position"])]
+            # get the index of the minimal distance
+            idx_min = tmp_df[["median distance"]].idxmin()
+            # record the index to remove of the other rows of the same donor - acceptor positions
+            tmp_index_to_remove = list(tmp_df.index.drop(idx_min))
+            if tmp_index_to_remove:
+                idx_to_remove = idx_to_remove + tmp_index_to_remove
+            donor_acceptor_nb_contacts.append(len(tmp_df.index))
+    df = df.drop(idx_to_remove)
+    df["number contacts"] = donor_acceptor_nb_contacts
+    df = df.sort_values(by=["donor position"])
+    return df
+
+
+def extract_residues_contacts(path_contacts, roi):
+    """
+    Extract the contacts from the CSV file residues contacts and filter on the region of interest (if any) for donors
+    and acceptors.
 
     :param path_contacts: the path to the contacts CSV path.
     :type path_contacts: str
-    :param roi_str: the string defining the donors residues region of interest, the format should be i.e: '100-200'.
-    :type roi_str: str
-    :param col: the name of the column to use for the atoms contacts between two residues.
-    :type col: str
-    :param thr: the maximal atoms distance threshold between two residues.
-    :type thr: float
+    :param roi: the list of the start and end positions of the Region Of Interest.
+    :type roi: list
     :return: the filtered contacts.
     :rtype: pd.Dataframe
     """
     # load the contacts file
-    df = pd.read_csv(path_contacts, sep=",")
-    logging.info(f"{len(df)} atoms contacts in the input data (residues pairs may have multiple atoms contacts).")
-    # select the donors region of interest if any
+    df_contacts = pd.read_csv(path_contacts, sep=",")
+    logging.info(f"{len(df_contacts)} atoms contacts in the input data (residues pairs may have multiple atoms "
+                 f"contacts).")
+    # select the rows of acceptors and donors within the region of interest if any
     roi_text = ""
-    if roi_str:
-        roi = extract_roi(roi_str)
+    if roi:
         # reduce to the donors region of interest limits
-        df = df[df["donor position"].between(roi[0], roi[1])]
-        logging.debug(f"{len(df)} atoms contacts in the region of interest.")
-        roi_text = f" in the donors region of interest {roi_str}"
+        df_donors = df_contacts[df_contacts["donor position"].between(roi[0], roi[1])]
+        print(f"donors:\n{df_donors}\n\n")
+        df_acceptors = df_contacts[df_contacts["acceptor position"].between(roi[0], roi[1])]
+        print(f"acceptors:\n{df_acceptors}\n\n")
+        logging.debug(f"{len(df_contacts)} atoms contacts in the region of interest.")
+        roi_text = f" for donors and acceptors in the region of interest {roi[0]}-{roi[1]}"
+        df_contacts = pd.concat([df_donors, df_acceptors]).drop_duplicates()
+        print(f"all:\n{df_contacts}\n\n")
 
-    df = df[df[col] <= thr]
-    logging.debug(f"{len(df)} atoms contacts detected{roi_text} for a maximal contacts distance of {thr} \u212B on "
-                  f"column \"{col.replace('_', ' ')}\".")
-    return df
+    df_residues_contacts = get_residues_in_contact(df_contacts)
+    logging.info(f"{len(df_residues_contacts)} extracted residues contacts for {len(df_contacts)} atoms contacts"
+                 f"{roi_text}.")
+    df_residues_contacts.to_csv("results/HEPAC-6_RNF19A_ORF1_0/tmp.csv")
+    return df_residues_contacts
+
+
+def get_df_distances_nb_contacts(df):
+    """
+    Create a distances and a number of contacts dataframes for the couples donors and acceptors.
+
+    :param df: the initial dataframe
+    :type df: pd.Dataframe
+    :return: the dataframe of distances and the dataframe of the number of contacts.
+    :rtype: pd.Dataframe, pd.Dataframe
+    """
+    # create the dictionaries of distances and number of contacts
+    distances = {}
+    nb_contacts = {}
+    donors = []
+    acceptors = []
+    unique_donor_positions = sorted(list(set(df["donor position"])))
+    unique_acceptor_positions = sorted(list(set(df["acceptor position"])))
+    for donor_position in unique_donor_positions:
+        donor = f"{donor_position}{df.loc[(df['donor position'] == donor_position), 'donor residue'].values[0]}"
+        if donor not in donors:
+            donors.append(donor)
+        for acceptor_position in unique_acceptor_positions:
+            acceptor = f"{acceptor_position}" \
+                       f"{df.loc[(df['acceptor position'] == acceptor_position), 'acceptor residue'].values[0]}"
+            if acceptor not in acceptors:
+                acceptors.append(acceptor)
+            # get the distance
+            if acceptor_position not in distances:
+                distances[acceptor_position] = []
+            dist = df.loc[(df["donor position"] == donor_position) & (df["acceptor position"] == acceptor_position),
+                          "median distance"]
+            if not dist.empty:
+                distances[acceptor_position].append(dist.values[0])
+            else:
+                distances[acceptor_position].append(None)
+            # get the number of contacts
+            if acceptor_position not in nb_contacts:
+                nb_contacts[acceptor_position] = []
+            contacts_found = df.loc[(df["donor position"] == donor_position) & (
+                        df["acceptor position"] == acceptor_position), "number contacts"]
+            if not contacts_found.empty:
+                nb_contacts[acceptor_position].append(contacts_found.values[0])
+            else:
+                nb_contacts[acceptor_position].append(None)
+    source_distances = pd.DataFrame(distances, index=donors)
+    source_distances.columns = acceptors
+    source_nb_contacts = pd.DataFrame(nb_contacts, index=donors)
+    source_nb_contacts.columns = acceptors
+    return source_distances, source_nb_contacts
+
+
+def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
+    """
+    Create the heatmap of contacts between residues.
+
+    :param contacts: the contacts by residues.
+    :type contacts: dict
+    :param params: the parameters used in the previous trajectory contacts analysis.
+    :type params: dict
+    :param bn: the basename.
+    :type bn: str
+    :param out_dir: the output directory.
+    :type out_dir: str
+    :param output_fmt: the output format for the heatmap.
+    :type output_fmt: str
+    :param lim_roi: the region of interest limits for the heatmap.
+    :type lim_roi: list
+    """
+    # create the distances and number of contacts dataframes to produce the heatmap
+    source_distances, source_nb_contacts = get_df_distances_nb_contacts(contacts)
+
+    # increase the size of the heatmap if too much entries
+    factor = int(len(source_distances) / 40) if len(source_distances) / 40 >= 1 else 1
+    logging.debug(f"{len(source_distances)} entries, the size of the figure is multiplied by a factor {factor}.")
+    rcParams["figure.figsize"] = 15 * factor, 12 * factor
+    # create the heatmap
+    heatmap = sns.heatmap(source_distances, annot=source_nb_contacts, cbar_kws={"label": "Distance (\u212B)"},
+                          linewidths=0.5, xticklabels=True, yticklabels=True)
+    heatmap.figure.axes[-1].yaxis.label.set_size(15)
+    plot = heatmap.get_figure()
+    title = f"Contact residues median distance: {bn}"
+    plt.suptitle(title, fontsize="large", fontweight="bold")
+    subtitle = "Number of residues atoms in contact are displayed in the squares."
+    if lim_roi:
+        subtitle = f"{subtitle}\nHeatmap focus on donor residues {lim_roi[0]} to {lim_roi[1]}"
+    if params["frames"]:
+        subtitle = f"{subtitle}\nMolecular Dynamics frames used: {params['frames']['min']} to {params['frames']['max']}"
+    plt.title(subtitle)
+    plt.xlabel("Acceptors", fontweight="bold")
+    plt.ylabel("Donors", fontweight="bold")
+    out_path = os.path.join(out_dir, f"heatmap_distances_{bn}.{output_fmt}")
+    plot.savefig(out_path)
+    # clear the plot for the next use of the function
+    plt.clf()
+    logging.info(f"\tmedian distance heatmap saved: {out_path}")
 
 
 def unique_residues_pairs(df_not_unique, col):
@@ -350,11 +488,10 @@ if __name__ == "__main__":
                              "'rgba': 'Raw RGBA bitmap', 'svg': 'Scalable Vector Graphics', "
                              "'svgz': 'Scalable Vector Graphics', 'tif': 'Tagged Image File Format', "
                              "'tiff': 'Tagged Image File Format'. Default is 'svg'.")
-    parser.add_argument("-a", "--atoms-distance", required=False, type=float, default=3.0,
-                        help="the atoms contacts distances threshold between two residues, default is 3.0 Angstroms.")
-    parser.add_argument("-r", "--residues-distance", required=False, type=int, default=10,
+    parser.add_argument("-r", "--residues-distance", required=False, type=int, default=4,
                         help="when 2 atoms of different residues are in contact, the minimal distance in number of "
-                             "residues that should separate them for a long range interaction, default is 10.")
+                             "residues that should separate them for a long range interaction. Default is 4 residues, "
+                             "the number of residues in an alpha helix.")
     parser.add_argument("-l", "--log", required=False, type=str,
                         help="the path for the log file. If this option is skipped, the log file is created in the "
                              "output directory.")
@@ -399,6 +536,11 @@ if __name__ == "__main__":
         logging.error(f"\"{args.col_distance}\" column name may refers to a column that is not an atoms distances.",
                       exc_info=True)
         sys.exit(1)
+
+    # get the heatmaps of validated contacts by residues
+    heatmap_contacts(residues_contacts, parameters_contacts_analysis, args.out, basename, args.format, roi_limits)
+    sys.exit()
+
     outliers = outliers_contacts(contacts, args.residues_distance, args.col_distance)
     logging.info(f"{len(outliers)} unique residues pairs contacts (<= {args.atoms_distance} \u212B) with a distance of "
                  f"at least {args.residues_distance} "
