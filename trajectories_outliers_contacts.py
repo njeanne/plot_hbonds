@@ -18,7 +18,9 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib import rcParams
 import seaborn as sns
+import yaml
 
 
 def create_log(log_path, level, out_dir):
@@ -55,7 +57,7 @@ def create_log(log_path, level, out_dir):
     logging.info(f"CMD: {' '.join(sys.argv)}")
 
 
-def extract_domains(domains_path):
+def get_domains(domains_path):
     """
     Load the domains file and fill in domains that are not covered.
 
@@ -90,8 +92,31 @@ def extract_domains(domains_path):
     return df
 
 
+def get_contacts_analysis_parameters(parameters_path):
+    """
+    Get the analysis parameters from the previous analysis from trajectories_contacts.py script.
+
+    :param parameters_path: the path to the YAML parameters file.
+    :type parameters_path: str
+    :return: the parameters.
+    :rtype: dict
+    """
+    with open(parameters_path, "r") as file_handler:
+        parameters = yaml.safe_load(file_handler.read())
+        logging.info("Parameters used for trajectory contacts search:")
+        for p_key, p_value in parameters.items():
+            if type(p_value) is dict:
+                logging.info(f"\t{p_key}:")
+                for p_key_2, p_value_2 in p_value.items():
+                    logging.info(f"\t\t{p_key_2}:\t{p_value_2}")
+            else:
+                logging.info(f"\t{p_key}:\t{p_value}")
+    return parameters
+
+
 def extract_roi(roi_to_extract):
-    """Extract the start and stop coordinates of the region of interest (roi).
+    """
+    Extract the start and stop coordinates of the region of interest (roi).
 
     :param roi_to_extract: the coordinates ot the region of interest, as 100-200 i.e.
     :type roi_to_extract: str
@@ -310,8 +335,9 @@ if __name__ == "__main__":
                              "annotation name, the 2nd is the residue start coordinate, the 3rd is the residue end "
                              "coordinate, the last one is the color to apply in hexadecimal format. The coordinate are "
                              "1-indexed.")
-    parser.add_argument("-c", "--col-distance", required=True, type=str,
-                        help="the name of the column to use for the atoms distances.")
+    parser.add_argument("-p", "--parameters", required=True, type=str,
+                        help="the path to the trajectory contacts analysis parameters (the YAML file in the results "
+                             "directory of the trajectory_contacts.py script.")
     parser.add_argument("-i", "--roi", required=False, type=str,
                         help="the donors region of interest coordinates, the format should be two digits separated by "
                              "an hyphen, i.e: '100-200'.")
@@ -344,12 +370,25 @@ if __name__ == "__main__":
 
     # get the input basename
     basename = os.path.splitext(os.path.basename(args.input))[0]
-    # load and format the BED file
-    domains_data = extract_domains(args.domains)
+    # load and format the domains file
+    domains_data = get_domains(args.domains)
+    # get the Region Of Interest if specified
+    if args.roi:
+        roi_limits = extract_roi(args.roi)
+    else:
+        roi_limits = None
+
+    # load the contacts analysis parameters
+    try:
+        parameters_contacts_analysis = get_contacts_analysis_parameters(args.parameters)
+    except ImportError as exc:
+        logging.error(exc, exc_info=True)
+        sys.exit(1)
 
     # extract the contacts
     try:
-        contacts = extract_contacts_with_atoms_distance(args.input, args.roi, args.col_distance, args.atoms_distance)
+        residues_contacts = extract_residues_contacts(args.input, roi_limits)
+        print(residues_contacts)
     except argparse.ArgumentTypeError as exc:
         logging.error(exc, exc_info=True)
         sys.exit(1)
