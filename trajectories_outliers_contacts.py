@@ -67,26 +67,60 @@ def get_domains(domains_path):
     :rtype: pd.Dataframe
     """
     raw = pd.read_csv(domains_path, sep=",", header=0, names=["domain", "start", "stop", "color"])
-    data = {"domain": [], "start": [], "stop": [], "color": []}
-    pos_start = 1
-    previous_region = None
+
+    # check for embedded entries
+    embedded_raw_idx = []
+    previous_stop = 0
     for idx, row in raw.iterrows():
-        if pos_start < row["start"]:  # not in domain
-            # record the undefined domain
-            data["start"].append(pos_start)
-            data["stop"].append(row["start"] - 1)
+        if row["stop"] < previous_stop:
+            embedded_raw_idx.append(idx)
+        else:
+            previous_stop = row["stop"]
+
+    # update the domains
+    data = {"domain": [], "start": [], "stop": [], "color": []}
+    expected_start = 1
+    previous = {"embedded": False, "domain": None, "stop": None, "color": None}
+    for idx, row in raw.iterrows():
+
+        if idx in embedded_raw_idx:  # case of embedded entry
+            # modify the previous end of the embedding domain
+            data["stop"][-1] = row["start"] - 1
+            # register the embedded domain
+            data["domain"].append(row["domain"])
+            data["start"].append(row["start"])
+            data["stop"].append(row["stop"])
             data["color"].append(row["color"])
-            if idx == 0:  # before first domain
-                data["domain"].append(f"before {row['domain']}")
-            else:
-                data["domain"].append(f"between {previous_region} and {row['domain']}")
-        # record the domain in the BED
-        data["domain"].append(row["domain"])
-        data["start"].append(row["start"])
-        data["stop"].append(row["stop"])
-        data["color"].append(row["color"])
-        pos_start = row["stop"] + 1
-        previous_region = row["domain"]
+            # record the end of the domain where the embedded is
+            previous["embedded"] = True
+            expected_start = row["stop"] + 1
+        else:
+            if previous["embedded"]:
+                # register the end of the domain where the previous was
+                data["domain"].append(previous["domain"])
+                data["start"].append(expected_start)
+                data["stop"].append(previous["stop"])
+                data["color"].append(previous["color"])
+                expected_start = previous["stop"] + 1
+                previous["embedded"] = False
+            if row["start"] > expected_start:  # between domains
+                # record the undefined domain
+                if idx == 0:  # before first domain
+                    data["domain"].append(f"before {row['domain']}")
+                else:
+                    data["domain"].append(f"between {previous['domain']} and {row['domain']}")
+                data["start"].append(expected_start)
+                data["stop"].append(row["start"] - 1)
+                data["color"].append("#cecece")
+            # record the current row domain
+            data["domain"].append(row["domain"])
+            data["start"].append(row["start"])
+            data["stop"].append(row["stop"])
+            data["color"].append(row["color"])
+            previous["domain"] = row["domain"]
+            previous["stop"] = row["stop"]
+            previous["color"] = row["color"]
+            expected_start = row["stop"] + 1
 
     df = pd.DataFrame(data)
     return df
@@ -138,39 +172,38 @@ def get_residues_in_contact(df):
     """
     Reduce the contacts to residues, if 2 residues have multiple atoms in contacts, the pair of atoms with the smallest
     distance will be kept, then create a column with the number of contacts between this 2 residues and finally sort
-    the data by position of the donors.
+    the data by position of the ordinates.
 
     :param df: the contacts from the trajectory analysis.
     :type df: pandas.Dataframe
-    :return: the reduced dataframe with the minimal distance value of all the couples of donors-acceptors and the
+    :return: the reduced dataframe with the minimal distance value of all the couples of ordinates-abscissas and the
     column with the number of contacts.
     :rtype: pd.Dataframe
     """
-    # convert the donor and acceptor positions columns to int
-    df["donor position"] = pd.to_numeric(df["donor position"])
-    df["acceptor position"] = pd.to_numeric(df["acceptor position"])
-    # donors_acceptors is used to register the combination of donor and acceptor and select only the value with the
-    # minimal contact distance and also the number of contacts
-    donors_acceptors = []
+    # combinations is used to register the combination of ordinate and abscissa, in this specific order, then
+    # select only the value with the minimal contact distance and also the number of contacts for this pair of residues
+    combinations = []
     idx_to_remove = []
-    donor_acceptor_nb_contacts = []
+    combinations_nb_contacts = []
     for _, row in df.iterrows():
-        donor = f"{row['donor position']}{row['donor residue']}"
-        acceptor = f"{row['acceptor position']}{row['acceptor residue']}"
-        if f"{donor}_{acceptor}" not in donors_acceptors:
-            donors_acceptors.append(f"{donor}_{acceptor}")
-            tmp_df = df[
-                (df["donor position"] == row["donor position"]) & (df["acceptor position"] == row["acceptor position"])]
+        first = f"{row['ordinate position']}{row['ordinate residue']}"
+        second = f"{row['abscissa position']}{row['abscissa residue']}"
+        if f"{first}_{second}" not in combinations:
+            combinations.append(f"{first}_{second}")
+            tmp_df = df[(df["ordinate position"] == row["ordinate position"]) & (
+                        df["abscissa position"] == row["abscissa position"]) | (
+                                    df["abscissa position"] == row["abscissa position"]) & (
+                                    df["ordinate position"] == row["ordinate position"])]
             # get the index of the minimal distance
             idx_min = tmp_df[["median distance"]].idxmin()
-            # record the index to remove of the other rows of the same donor - acceptor positions
+            # record the index to remove of the other rows of the same combinations positions
             tmp_index_to_remove = list(tmp_df.index.drop(idx_min))
             if tmp_index_to_remove:
                 idx_to_remove = idx_to_remove + tmp_index_to_remove
-            donor_acceptor_nb_contacts.append(len(tmp_df.index))
+            combinations_nb_contacts.append(len(tmp_df.index))
     df = df.drop(idx_to_remove)
-    df["number contacts"] = donor_acceptor_nb_contacts
-    df = df.sort_values(by=["donor position"])
+    df["atoms contacts"] = combinations_nb_contacts
+    df = df.sort_values(by=["ordinate position"])
     return df
 
 
@@ -187,37 +220,64 @@ def extract_residues_contacts(path_contacts, roi):
     :rtype: pd.Dataframe
     """
     # load the contacts file
-    df_contacts = pd.read_csv(path_contacts, sep=",")
-    logging.info(f"{len(df_contacts)} atoms contacts in the input data (residues pairs may have multiple atoms "
+    df_contacts_all = pd.read_csv(path_contacts, sep=",")
+    logging.info(f"{len(df_contacts_all)} atoms contacts in the input data (residues pairs may have multiple atoms "
                  f"contacts).")
     # select the rows of acceptors and donors within the region of interest if any
     roi_text = ""
+    ordinate_type = []
+    ordinate_position = []
+    ordinate_residue = []
+    abscissa_position = []
+    abscissa_residue = []
     if roi:
         # reduce to the donors region of interest limits
-        df_donors = df_contacts[df_contacts["donor position"].between(roi[0], roi[1])]
-        print(f"donors:\n{df_donors}\n\n")
-        df_acceptors = df_contacts[df_contacts["acceptor position"].between(roi[0], roi[1])]
-        print(f"acceptors:\n{df_acceptors}\n\n")
-        logging.debug(f"{len(df_contacts)} atoms contacts in the region of interest.")
+        df_donors = df_contacts_all[df_contacts_all["donor position"].between(roi[0], roi[1])]
+        df_acceptors = df_contacts_all[df_contacts_all["acceptor position"].between(roi[0], roi[1])]
+        logging.debug(f"{len(df_contacts_all)} atoms contacts in the region of interest.")
         roi_text = f" for donors and acceptors in the region of interest {roi[0]}-{roi[1]}"
-        df_contacts = pd.concat([df_donors, df_acceptors]).drop_duplicates()
-        print(f"all:\n{df_contacts}\n\n")
-
-    df_residues_contacts = get_residues_in_contact(df_contacts)
-    logging.info(f"{len(df_residues_contacts)} extracted residues contacts for {len(df_contacts)} atoms contacts"
-                 f"{roi_text}.")
-    df_residues_contacts.to_csv("results/HEPAC-6_RNF19A_ORF1_0/tmp.csv")
+        df_contacts_all = pd.concat([df_donors, df_acceptors]).drop_duplicates()
+        for _, row in df_contacts_all.iterrows():
+            if roi[0] <= row["donor position"] <= roi[1]:
+                ordinate_type.append("donor")
+                ordinate_position.append(row["donor position"])
+                ordinate_residue.append(row["donor residue"])
+                abscissa_position.append(row["acceptor position"])
+                abscissa_residue.append(row["acceptor residue"])
+            else:
+                ordinate_type.append("acceptor")
+                ordinate_position.append(row["acceptor position"])
+                ordinate_residue.append(row["acceptor residue"])
+                abscissa_position.append(row["donor position"])
+                abscissa_residue.append(row["donor residue"])
+    else:
+        for _, row in df_contacts_all.iterrows():
+            ordinate_type.append("donor")
+            ordinate_position.append(row["donor position"])
+            ordinate_residue.append(row["donor residue"])
+            abscissa_position.append(row["acceptor position"])
+            abscissa_residue.append(row["acceptor residue"])
+    # loose the notions of donor and acceptor to use ordinate and abscissas
+    df_tmp = pd.DataFrame({"contact": df_contacts_all["contact"],
+                           "ordinate position": ordinate_position,
+                           "ordinate residue": ordinate_residue,
+                           "abscissa position": abscissa_position,
+                           "abscissa residue": abscissa_residue,
+                           "median distance": df_contacts_all["median distance"],
+                           "ordinate type": ordinate_type})
+    # reduce to residue contacts
+    df_residues_contacts = get_residues_in_contact(df_tmp)
+    logging.info(f"{len(df_residues_contacts)} extracted residues contacts with {len(df_contacts_all)} atoms "
+                 f"contacts{roi_text}.")
     return df_residues_contacts
 
 
-def get_df_distances_nb_contacts(df, roi):
+def heatmap_distances_nb_contacts(df):
     """
-    Create a distances and a number of contacts dataframes for the couples donors and acceptors.
+    Create a distances and a number of contacts dataframes for the couples ordinates and abscissas.
 
     :param df: the initial dataframe
     :type df: pd.Dataframe
-    :param roi: the Region Of Interest (ROI) limits for the heatmap Y axis.
-    :type roi: list
     :return: the dataframe of distances and the dataframe of the number of contacts.
     :rtype: pd.Dataframe, pd.Dataframe
     """
@@ -225,45 +285,41 @@ def get_df_distances_nb_contacts(df, roi):
     # create the dictionaries of distances and number of contacts
     distances = {}
     nb_contacts = {}
-    donors = []
-    acceptors = []
-    unique_donor_positions = sorted(list(set(df["donor position"])))
-    unique_acceptor_positions = sorted(list(set(df["acceptor position"])))
-    for donor_position in unique_donor_positions:
-        donor = f"{donor_position}{df.loc[(df['donor position'] == donor_position), 'donor residue'].values[0]}"
-        if donor not in donors:
-            donors.append(donor)
-        for acceptor_position in unique_acceptor_positions:
-            acceptor = f"{acceptor_position}" \
-                       f"{df.loc[(df['acceptor position'] == acceptor_position), 'acceptor residue'].values[0]}"
-            if acceptor not in acceptors:
-                acceptors.append(acceptor)
+    ordinates = []
+    abscissas = []
+    unique_ordinate_positions = sorted(list(set(df["ordinate position"])))
+    unique_abscissa_positions = sorted(list(set(df["abscissa position"])))
+    for ordinate_position in unique_ordinate_positions:
+        ordinate = f"{ordinate_position}{df.loc[(df['ordinate position'] == ordinate_position), 'ordinate residue'].values[0]}"
+        if ordinate not in ordinates:
+            ordinates.append(ordinate)
+        for abscissa_position in unique_abscissa_positions:
+            abscissa = f"{abscissa_position}" \
+                       f"{df.loc[(df['abscissa position'] == abscissa_position), 'abscissa residue'].values[0]}"
+            if abscissa not in abscissas:
+                abscissas.append(abscissa)
             # get the distance
-            if acceptor_position not in distances:
-                distances[acceptor_position] = []
-            dist = df.loc[(df["donor position"] == donor_position) & (df["acceptor position"] == acceptor_position),
-                          "median distance"]
+            if abscissa_position not in distances:
+                distances[abscissa_position] = []
+            dist = df.loc[(df["ordinate position"] == ordinate_position) & (
+                        df["abscissa position"] == abscissa_position), "median distance"]
             if not dist.empty:
-                distances[acceptor_position].append(dist.values[0])
+                distances[abscissa_position].append(dist.values[0])
             else:
-                distances[acceptor_position].append(None)
+                distances[abscissa_position].append(None)
             # get the number of contacts
-            if acceptor_position not in nb_contacts:
-                nb_contacts[acceptor_position] = []
-            contacts = df.loc[(df["donor position"] == donor_position) & (df["acceptor position"] == acceptor_position),
-                              "number contacts"]
+            if abscissa_position not in nb_contacts:
+                nb_contacts[abscissa_position] = []
+            contacts = df.loc[(df["ordinate position"] == ordinate_position) & (
+                        df["abscissa position"] == abscissa_position), "atoms contacts"]
             if not contacts.empty:
-                nb_contacts[acceptor_position].append(contacts.values[0])
+                nb_contacts[abscissa_position].append(contacts.values[0])
             else:
-                nb_contacts[acceptor_position].append(None)
-    source_distances = pd.DataFrame(distances, index=donors)
-    source_distances.columns = acceptors
-    # todo: remove
-    source_distances.to_csv("/home/jeanne_n/dev/trajectories_outliers_contacts/results/HEPAC-6_RNF19A_ORF1_0/distances.csv")
-    source_nb_contacts = pd.DataFrame(nb_contacts, index=donors)
-    source_nb_contacts.columns = acceptors
-    # todo: remove
-    source_nb_contacts.to_csv("/home/jeanne_n/dev/trajectories_outliers_contacts/results/HEPAC-6_RNF19A_ORF1_0/nb_contacts.csv")
+                nb_contacts[abscissa_position].append(None)
+    source_distances = pd.DataFrame(distances, index=ordinates)
+    source_distances.columns = abscissas
+    source_nb_contacts = pd.DataFrame(nb_contacts, index=ordinates)
+    source_nb_contacts.columns = abscissas
     return source_distances, source_nb_contacts
 
 
@@ -284,8 +340,9 @@ def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
     :param lim_roi: the region of interest limits for the heatmap.
     :type lim_roi: list
     """
+    logging.info("Computing contacts heatmap..")
     # create the distances and number of contacts dataframes to produce the heatmap
-    source_distances, source_nb_contacts = get_df_distances_nb_contacts(contacts, lim_roi)
+    source_distances, source_nb_contacts = heatmap_distances_nb_contacts(contacts)
 
     # increase the size of the heatmap if too much entries
     factor = int(len(source_distances) / 40) if len(source_distances) / 40 >= 1 else 1
@@ -298,14 +355,18 @@ def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
     plot = heatmap.get_figure()
     title = f"Contact residues median distance: {bn}"
     plt.suptitle(title, fontsize="large", fontweight="bold")
-    subtitle = "Number of residues atoms in contact are displayed in the squares."
+    subtitle = "Count of residues atoms in contact are displayed in the squares."
     if lim_roi:
-        subtitle = f"{subtitle}\nHeatmap focus on residues {lim_roi[0]} to {lim_roi[1]}"
+        subtitle = f"{subtitle}\nRegion Of Interest: {lim_roi[0]} to {lim_roi[1]} ({params['protein length']} " \
+                   f"residues in the protein)"
+    else:
+        subtitle = f"{subtitle}\nRegion Of Interest: 1 to {params['protein length']} (whole protein)"
     if params["frames"]:
-        subtitle = f"{subtitle}\nMolecular Dynamics frames used: {params['frames']['min']} to {params['frames']['max']}"
+        subtitle = f"{subtitle}\n{params['proportion contacts']}% of frames with contacts in frames range " \
+                   f"{params['frames']['min']} to {params['frames']['max']}"
     plt.title(subtitle)
-    plt.xlabel("Acceptors", fontweight="bold")
-    plt.ylabel("Donors", fontweight="bold")
+    plt.xlabel("Whole protein residues", fontweight="bold")
+    plt.ylabel("Region Of Interest residues", fontweight="bold")
     out_path = os.path.join(out_dir, f"heatmap_distances_{bn}.{output_fmt}")
     plot.savefig(out_path)
     # clear the plot for the next use of the function
@@ -356,7 +417,7 @@ def unique_residues_pairs(df_not_unique, col):
     return df_uniques
 
 
-def outliers_contacts(df, res_dist_thr, col_dist):
+def outliers_contacts(df, res_dist_thr):
     """
     Get the residues pairs contacts above the residues distance contacts, meaning contacts of distant residues.
 
@@ -364,21 +425,19 @@ def outliers_contacts(df, res_dist_thr, col_dist):
     :type df: pd.Dataframe
     :param res_dist_thr: the residues distance threshold.
     :type res_dist_thr: int
-    :param col_dist: the atoms distances column name.
-    :type col_dist: str
     :return: the dataframe of unique residues pairs contacts.
     :rtype: pd.Dataframe
     """
     idx_to_remove_for_residue_distance = []
     for idx, row in df.iterrows():
-        if abs(row["donor position"] - row["acceptor position"]) < res_dist_thr:
+        if abs(row["ordinate position"] - row["abscissa position"]) < res_dist_thr:
             idx_to_remove_for_residue_distance.append(idx)
     # remove rows with too close distance between the residues
     df.drop(idx_to_remove_for_residue_distance, inplace=True, axis=0)
+    # reset the index of the dataframe from 0
+    df.reset_index(inplace=True, drop=True)
     logging.debug(f"{len(df)} atoms contacts remaining with a minimal residues distance threshold of {res_dist_thr}.")
-    # reduce to one row when more than one atom per residue
-    unique = unique_residues_pairs(df, col_dist)
-    return unique
+    return df
 
 
 def update_domains(df, domains, path):
@@ -398,18 +457,18 @@ def update_domains(df, domains, path):
     acceptors_regions = [None] * len(df)
     for idx, row_contacts in df.iterrows():
         for _, row_domains in domains.iterrows():
-            if row_domains["start"] <= row_contacts["donor positions"] <= row_domains["stop"]:
+            if row_domains["start"] <= row_contacts["ordinate position"] <= row_domains["stop"]:
                 donors_regions[idx] = row_domains["domain"]
-            if row_domains["start"] <= row_contacts["acceptor positions"] <= row_domains["stop"]:
+            if row_domains["start"] <= row_contacts["abscissa position"] <= row_domains["stop"]:
                 acceptors_regions[idx] = row_domains["domain"]
-    df.insert(2, "donor domains", pd.DataFrame(donors_regions))
-    df.insert(5, "acceptor domains", pd.DataFrame(acceptors_regions))
+    df.insert(2, "ordinate domains", pd.DataFrame(donors_regions))
+    df.insert(5, "abscissa domains", pd.DataFrame(acceptors_regions))
     df.to_csv(path, index=False)
     logging.info(f"Pairs residues contacts updated with domains saved: {path}")
     return df
 
 
-def acceptors_domains_involved(df, domains, out_dir, bn, roi, atoms_dist, res_dist, fmt):
+def acceptors_domains_involved(df, domains, out_dir, bn, roi, fmt, res_dist, params):
     """
     Create the plot of contacts by regions.
 
@@ -423,16 +482,16 @@ def acceptors_domains_involved(df, domains, out_dir, bn, roi, atoms_dist, res_di
     :type bn: str
     :param roi: the region of interest.
     :type roi: str
-    :param atoms_dist: the maximal atoms distance contact.
-    :type atoms_dist: str
-    :param res_dist: the maximal residues distance in the amino acids chain.
-    :type res_dist: int
     :param fmt: the format for the plot.
     :type fmt: str
+    :param res_dist: the maximal residues distance in the amino acids chain.
+    :type res_dist: int
+    :param params: the parameters of the trajectory analysis
+    :type params: dict
     """
     data = {}
     for _, row_domains in domains.iterrows():
-        tmp = df[df["acceptor domains"] == row_domains["domain"]]
+        tmp = df[df["abscissa domains"] == row_domains["domain"]]
         if not tmp.empty:
             if not row_domains["domain"] in data:
                 data[row_domains["domain"]] = 0
@@ -447,11 +506,14 @@ def acceptors_domains_involved(df, domains, out_dir, bn, roi, atoms_dist, res_di
     sns.barplot(data=source, ax=ax, x="domain", y="number of contacts", color="blue")
     ax.set_xticklabels(source["domain"], rotation=45, horizontalalignment="right")
     ax.set_xlabel(None)
-    ax.set_ylabel("Number of contacts", fontweight="bold")
+    ax.set_ylabel("Residue contacts", fontweight="bold")
     ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
     ax.text(x=0.5, y=1.1, s=f"{bn}: outliers contacts by domains{' (region of interest ' + roi + ')' if roi else ''}",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
-    ax.text(x=0.5, y=1.05, s=f"Maximal atoms distance: {atoms_dist} \u212B, maximal residues distance: {res_dist}",
+    ax.text(x=0.5, y=1.0,
+            s=f"Maximal atoms distance: {params['maximal atoms distance']} \u212B, minimal angle cut-off "
+              f"{params['angle cutoff']}°, minimal residues distance: {res_dist}\n{params['proportion contacts']}% of "
+              f"frames with contacts in frames range {params['frames']['min']} to {params['frames']['max']}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
     path = os.path.join(out_dir, f"outliers_{bn}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
@@ -532,7 +594,6 @@ if __name__ == "__main__":
     # extract the contacts
     try:
         residues_contacts = extract_residues_contacts(args.input, roi_limits)
-        print(residues_contacts)
     except argparse.ArgumentTypeError as exc:
         logging.error(exc, exc_info=True)
         sys.exit(1)
@@ -546,17 +607,16 @@ if __name__ == "__main__":
 
     # get the heatmaps of validated contacts by residues
     heatmap_contacts(residues_contacts, parameters_contacts_analysis, basename, args.out, args.format, roi_limits)
-    sys.exit()
 
-    outliers = outliers_contacts(contacts, args.residues_distance, args.col_distance)
-    logging.info(f"{len(outliers)} unique residues pairs contacts (<= {args.atoms_distance} \u212B) with a distance of "
-                 f"at least {args.residues_distance} "
-                 f"residues{' in the region of interest '+args.roi if args.roi else ''} (residues pair may have "
-                 f"multiple atoms contacts).")
+    outliers = outliers_contacts(residues_contacts, args.residues_distance)
+    logging.info(f"{len(outliers)} unique residues pairs contacts (<= "
+                 f"{parameters_contacts_analysis['maximal atoms distance']} \u212B) with a distance of at least "
+                 f"{args.residues_distance} residues{' in the region of interest '+args.roi if args.roi else ''} "
+                 f"(residues pair may have multiple atoms contacts).")
 
     # get the outliers contacts
     outliers = update_domains(outliers, domains_data, os.path.join(args.out, f"outliers_{basename}.csv"))
 
     # by acceptor domain
-    acceptors_domains_involved(outliers, domains_data, args.out, basename, args.roi, args.atoms_distance,
-                               args.residues_distance, args.format)
+    acceptors_domains_involved(outliers, domains_data, args.out, basename, args.roi, args.format,
+                               args.residues_distance, parameters_contacts_analysis)
