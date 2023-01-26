@@ -57,15 +57,20 @@ def create_log(log_path, level, out_dir):
     logging.info(f"CMD: {' '.join(sys.argv)}")
 
 
-def get_domains(domains_path):
+def get_domains(domains_path, use_embedded):
     """
     Load the domains file and fill in domains that are not covered.
 
     :param domains_path: the path to the domains file.
     :type domains_path: str
-    :return: the filled-in BED.
+    :param use_embedded: if an embedded domain should be use as a domain or if only the embedding domain should be
+    processed.
+    :type use_embedded: bool
+    :return: the filled-in domains data frame.
     :rtype: pd.Dataframe
     """
+    logging.info(f"domains embedded in other domains will{' ' if use_embedded else ' not '}be used in the contacts "
+                 f"by domain plot.")
     raw = pd.read_csv(domains_path, sep=",", header=0, names=["domain", "start", "stop", "color"])
 
     # check for embedded entries
@@ -82,18 +87,18 @@ def get_domains(domains_path):
     expected_start = 1
     previous = {"embedded": False, "domain": None, "stop": None, "color": None}
     for idx, row in raw.iterrows():
-
         if idx in embedded_raw_idx:  # case of embedded entry
-            # modify the previous end of the embedding domain
-            data["stop"][-1] = row["start"] - 1
-            # register the embedded domain
-            data["domain"].append(row["domain"])
-            data["start"].append(row["start"])
-            data["stop"].append(row["stop"])
-            data["color"].append(row["color"])
-            # record the end of the domain where the embedded is
-            previous["embedded"] = True
-            expected_start = row["stop"] + 1
+            if use_embedded:
+                # modify the previous end of the embedding domain
+                data["stop"][-1] = row["start"] - 1
+                # register the embedded domain
+                data["domain"].append(row["domain"])
+                data["start"].append(row["start"])
+                data["stop"].append(row["stop"])
+                data["color"].append(row["color"])
+                # record the end of the domain where the embedded is
+                previous["embedded"] = True
+                expected_start = row["stop"] + 1
         else:
             if previous["embedded"]:
                 # register the end of the domain where the previous was
@@ -353,9 +358,10 @@ def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
                           linewidths=0.5, xticklabels=True, yticklabels=True)
     heatmap.figure.axes[-1].yaxis.label.set_size(15)
     plot = heatmap.get_figure()
-    title = f"Contact residues median distance: {bn}"
+    title = f"Contact residues median distance: {params['sample'] if 'sample' in params else bn}"
     plt.suptitle(title, fontsize="large", fontweight="bold")
-    subtitle = "Count of residues atoms in contact are displayed in the squares."
+    md_duration = f"MD length: {params['MD duration']}. " if "MD duration" in params else ""
+    subtitle = f"{md_duration}Count of residues atoms in contact are displayed in the squares."
     if lim_roi:
         subtitle = f"{subtitle}\nRegion Of Interest: {lim_roi[0]} to {lim_roi[1]} ({params['protein length']} " \
                    f"residues in the protein)"
@@ -506,14 +512,17 @@ def acceptors_domains_involved(df, domains, out_dir, bn, roi, fmt, res_dist, par
     sns.barplot(data=source, ax=ax, x="domain", y="number of contacts", color="blue")
     ax.set_xticklabels(source["domain"], rotation=45, horizontalalignment="right")
     ax.set_xlabel(None)
-    ax.set_ylabel("Residue contacts", fontweight="bold")
+    ax.set_ylabel(f"{'Region Of Interest ' + roi if roi else 'Whole protein'} residues contacts", fontweight="bold")
     ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
-    ax.text(x=0.5, y=1.1, s=f"{bn}: outliers contacts by domains{' (region of interest ' + roi + ')' if roi else ''}",
+    ax.text(x=0.5, y=1.1, s=f"{params['sample'] if 'sample' in params else bn}: outliers contacts by domains\nbetween "
+                            f"the {'Region Of Interest ' + roi if roi else 'whole protein'} and the whole protein",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
+    md_duration = f", MD length: {params['MD duration']}." if "MD duration" in params else ""
     ax.text(x=0.5, y=1.0,
             s=f"Maximal atoms distance: {params['maximal atoms distance']} \u212B, minimal angle cut-off "
               f"{params['angle cutoff']}°, minimal residues distance: {res_dist}\n{params['proportion contacts']}% of "
-              f"frames with contacts in frames range {params['frames']['min']} to {params['frames']['max']}",
+              f"frames with contacts in frames range {params['frames']['min']} to {params['frames']['max']}"
+              f"{md_duration}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
     path = os.path.join(out_dir, f"outliers_{bn}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
@@ -530,10 +539,11 @@ if __name__ == "__main__":
 
     Distributed on an "AS IS" basis without warranties or conditions of any kind, either express or implied.
 
-    From a CSV of the amino acids contacts file produced by the script trajectories
-    (https://github.com/njeanne/trajectories), extract the information of the contacts outside the neighbourhood 
-    contacts of an amino acid and determine to which domain the acceptor amino acid belongs to using a BED file 
-    registering the domains.
+    From a CSV of the amino acids contacts file and a YAML parameters file produced by the script 
+    trajectories_contacts.py (https://github.com/njeanne/trajectories), extract the information of the contacts outside 
+    the neighbourhood  contacts of an amino acid and determine to which domain it belongs to using a CSV file for the 
+    annotation of the  domains.
+    For this CSV, if some domains are embedded in other domains, they can be processed with the option "--use-embedded".
     """
     parser = argparse.ArgumentParser(description=descr, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-o", "--out", required=True, type=str, help="the path to the output directory.")
@@ -561,6 +571,11 @@ if __name__ == "__main__":
                         help="when 2 atoms of different residues are in contact, the minimal distance in number of "
                              "residues that should separate them for a long range interaction. Default is 4 residues, "
                              "the number of residues in an alpha helix.")
+    parser.add_argument("-e", "--embedded-domains", required=False, action="store_true",
+                        help="for the outliers plot of contacts between a specific domain and the whole protein, use "
+                             "the domains embedded in another domain. In example, if the domain 2 is in domain 1, the "
+                             "plot will represent the domain 1 as: domain-1 domain-2 domain-1. If this option is not "
+                             "used only the domain 1 will be used in the plot.")
     parser.add_argument("-l", "--log", required=False, type=str,
                         help="the path for the log file. If this option is skipped, the log file is created in the "
                              "output directory.")
@@ -577,7 +592,7 @@ if __name__ == "__main__":
     # get the input basename
     basename = os.path.splitext(os.path.basename(args.input))[0]
     # load and format the domains file
-    domains_data = get_domains(args.domains)
+    domains_data = get_domains(args.domains, args.embedded_domains)
     # get the Region Of Interest if specified
     if args.roi:
         roi_limits = extract_roi(args.roi)
