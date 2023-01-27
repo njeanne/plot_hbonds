@@ -194,28 +194,28 @@ def get_residues_in_contact(df):
     """
     Reduce the contacts to residues, if 2 residues have multiple atoms in contacts, the pair of atoms with the smallest
     distance will be kept, then create a column with the number of contacts between this 2 residues and finally sort
-    the data by position of the ordinates.
+    the data by position of the first residue in the interaction.
 
     :param df: the contacts from the trajectory analysis.
     :type df: pandas.Dataframe
-    :return: the reduced dataframe with the minimal distance value of all the couples of ordinates-abscissas and the
-    column with the number of contacts.
+    :return: the reduced dataframe with the minimal distance value of all the couples of first partner - second partner
+    and the column with the number of contacts.
     :rtype: pd.Dataframe
     """
-    # combinations is used to register the combination of ordinate and abscissa, in this specific order, then
+    # combinations is used to register the combination of first partner and second partner, in this specific order, then
     # select only the value with the minimal contact distance and also the number of contacts for this pair of residues
     combinations = []
     idx_to_remove = []
     combinations_nb_contacts = []
     for _, row in df.iterrows():
-        first = f"{row['ordinate position']}{row['ordinate residue']}"
-        second = f"{row['abscissa position']}{row['abscissa residue']}"
+        first = f"{row['first partner position']}{row['first partner residue']}"
+        second = f"{row['second partner position']}{row['second partner residue']}"
         if f"{first}_{second}" not in combinations:
             combinations.append(f"{first}_{second}")
-            tmp_df = df[(df["ordinate position"] == row["ordinate position"]) & (
-                        df["abscissa position"] == row["abscissa position"]) | (
-                                    df["abscissa position"] == row["abscissa position"]) & (
-                                    df["ordinate position"] == row["ordinate position"])]
+            tmp_df = df[(df["first partner position"] == row["first partner position"]) & (
+                        df["second partner position"] == row["second partner position"]) | (
+                                    df["second partner position"] == row["second partner position"]) & (
+                                    df["first partner position"] == row["first partner position"])]
             # get the index of the minimal distance
             idx_min = tmp_df[["median distance"]].idxmin()
             # record the index to remove of the other rows of the same combinations positions
@@ -225,7 +225,7 @@ def get_residues_in_contact(df):
             combinations_nb_contacts.append(len(tmp_df.index))
     df = df.drop(idx_to_remove)
     df["atoms contacts"] = combinations_nb_contacts
-    df = df.sort_values(by=["ordinate position"])
+    df = df.sort_values(by=["first partner position"])
     return df
 
 
@@ -247,11 +247,11 @@ def extract_residues_contacts(path_contacts, roi):
                  f"contacts).")
     # select the rows of acceptors and donors within the region of interest if any
     roi_text = ""
-    ordinate_type = []
-    ordinate_position = []
-    ordinate_residue = []
-    abscissa_position = []
-    abscissa_residue = []
+    first_type = []
+    first_position = []
+    first_residue = []
+    second_position = []
+    second_residue = []
     if roi:
         # reduce to the donors region of interest limits
         df_donors = df_contacts_all[df_contacts_all["donor position"].between(roi[0], roi[1])]
@@ -261,32 +261,32 @@ def extract_residues_contacts(path_contacts, roi):
         df_contacts_all = pd.concat([df_donors, df_acceptors]).drop_duplicates()
         for _, row in df_contacts_all.iterrows():
             if roi[0] <= row["donor position"] <= roi[1]:
-                ordinate_type.append("donor")
-                ordinate_position.append(row["donor position"])
-                ordinate_residue.append(row["donor residue"])
-                abscissa_position.append(row["acceptor position"])
-                abscissa_residue.append(row["acceptor residue"])
+                first_type.append("donor")
+                first_position.append(row["donor position"])
+                first_residue.append(row["donor residue"])
+                second_position.append(row["acceptor position"])
+                second_residue.append(row["acceptor residue"])
             else:
-                ordinate_type.append("acceptor")
-                ordinate_position.append(row["acceptor position"])
-                ordinate_residue.append(row["acceptor residue"])
-                abscissa_position.append(row["donor position"])
-                abscissa_residue.append(row["donor residue"])
+                first_type.append("acceptor")
+                first_position.append(row["acceptor position"])
+                first_residue.append(row["acceptor residue"])
+                second_position.append(row["donor position"])
+                second_residue.append(row["donor residue"])
     else:
         for _, row in df_contacts_all.iterrows():
-            ordinate_type.append("donor")
-            ordinate_position.append(row["donor position"])
-            ordinate_residue.append(row["donor residue"])
-            abscissa_position.append(row["acceptor position"])
-            abscissa_residue.append(row["acceptor residue"])
-    # loose the notions of donor and acceptor to use ordinate and abscissas
+            first_type.append("donor")
+            first_position.append(row["donor position"])
+            first_residue.append(row["donor residue"])
+            second_position.append(row["acceptor position"])
+            second_residue.append(row["acceptor residue"])
+    # loose the notions of donor and acceptor to use first and second partner
     df_tmp = pd.DataFrame({"contact": df_contacts_all["contact"],
-                           "ordinate position": ordinate_position,
-                           "ordinate residue": ordinate_residue,
-                           "abscissa position": abscissa_position,
-                           "abscissa residue": abscissa_residue,
+                           "first partner position": first_position,
+                           "first partner residue": first_residue,
+                           "second partner position": second_position,
+                           "second partner residue": second_residue,
                            "median distance": df_contacts_all["median distance"],
-                           "ordinate type": ordinate_type})
+                           "first partner type": first_type})
     # reduce to residue contacts
     df_residues_contacts = get_residues_in_contact(df_tmp)
     logging.info(f"{len(df_residues_contacts)} extracted residues contacts with {len(df_contacts_all)} atoms "
@@ -296,7 +296,7 @@ def extract_residues_contacts(path_contacts, roi):
 
 def heatmap_distances_nb_contacts(df):
     """
-    Create a distances and a number of contacts dataframes for the couples ordinates and abscissas.
+    Create a distances and a number of contacts dataframes for the couples first and second partner.
 
     :param df: the initial dataframe
     :type df: pd.Dataframe
@@ -307,41 +307,42 @@ def heatmap_distances_nb_contacts(df):
     # create the dictionaries of distances and number of contacts
     distances = {}
     nb_contacts = {}
-    ordinates = []
-    abscissas = []
-    unique_ordinate_positions = sorted(list(set(df["ordinate position"])))
-    unique_abscissa_positions = sorted(list(set(df["abscissa position"])))
-    for ordinate_position in unique_ordinate_positions:
-        ordinate = f"{ordinate_position}{df.loc[(df['ordinate position'] == ordinate_position), 'ordinate residue'].values[0]}"
-        if ordinate not in ordinates:
-            ordinates.append(ordinate)
-        for abscissa_position in unique_abscissa_positions:
-            abscissa = f"{abscissa_position}" \
-                       f"{df.loc[(df['abscissa position'] == abscissa_position), 'abscissa residue'].values[0]}"
-            if abscissa not in abscissas:
-                abscissas.append(abscissa)
+    firsts = []
+    seconds = []
+    unique_first_positions = sorted(list(set(df["first partner position"])))
+    unique_second_positions = sorted(list(set(df["second partner position"])))
+    for first_position in unique_first_positions:
+        first = f"{first_position}" \
+                f"{df.loc[(df['first partner position'] == first_position), 'first partner residue'].values[0]}"
+        if first not in firsts:
+            firsts.append(first)
+        for second_position in unique_second_positions:
+            second = f"{second_position}" \
+                     f"{df.loc[(df['second partner position'] == second_position), 'second partner residue'].values[0]}"
+            if second not in seconds:
+                seconds.append(second)
             # get the distance
-            if abscissa_position not in distances:
-                distances[abscissa_position] = []
-            dist = df.loc[(df["ordinate position"] == ordinate_position) & (
-                        df["abscissa position"] == abscissa_position), "median distance"]
+            if second_position not in distances:
+                distances[second_position] = []
+            dist = df.loc[(df["first partner position"] == first_position) & (
+                        df["second partner position"] == second_position), "median distance"]
             if not dist.empty:
-                distances[abscissa_position].append(dist.values[0])
+                distances[second_position].append(dist.values[0])
             else:
-                distances[abscissa_position].append(None)
+                distances[second_position].append(None)
             # get the number of contacts
-            if abscissa_position not in nb_contacts:
-                nb_contacts[abscissa_position] = []
-            contacts = df.loc[(df["ordinate position"] == ordinate_position) & (
-                        df["abscissa position"] == abscissa_position), "atoms contacts"]
+            if second_position not in nb_contacts:
+                nb_contacts[second_position] = []
+            contacts = df.loc[(df["first partner position"] == first_position) & (
+                        df["second partner position"] == second_position), "atoms contacts"]
             if not contacts.empty:
-                nb_contacts[abscissa_position].append(contacts.values[0])
+                nb_contacts[second_position].append(contacts.values[0])
             else:
-                nb_contacts[abscissa_position].append(None)
-    source_distances = pd.DataFrame(distances, index=ordinates)
-    source_distances.columns = abscissas
-    source_nb_contacts = pd.DataFrame(nb_contacts, index=ordinates)
-    source_nb_contacts.columns = abscissas
+                nb_contacts[second_position].append(None)
+    source_distances = pd.DataFrame(distances, index=firsts)
+    source_distances.columns = seconds
+    source_nb_contacts = pd.DataFrame(nb_contacts, index=firsts)
+    source_nb_contacts.columns = seconds
     return source_distances, source_nb_contacts
 
 
@@ -453,7 +454,7 @@ def outliers_contacts(df, res_dist_thr):
     """
     idx_to_remove_for_residue_distance = []
     for idx, row in df.iterrows():
-        if abs(row["ordinate position"] - row["abscissa position"]) < res_dist_thr:
+        if abs(row["first partner position"] - row["second partner position"]) < res_dist_thr:
             idx_to_remove_for_residue_distance.append(idx)
     # remove rows with too close distance between the residues
     df.drop(idx_to_remove_for_residue_distance, inplace=True, axis=0)
@@ -480,12 +481,12 @@ def update_domains(df, domains, path):
     acceptors_regions = [None] * len(df)
     for idx, row_contacts in df.iterrows():
         for _, row_domains in domains.iterrows():
-            if row_domains["start"] <= row_contacts["ordinate position"] <= row_domains["stop"]:
+            if row_domains["start"] <= row_contacts["first partner position"] <= row_domains["stop"]:
                 donors_regions[idx] = row_domains["domain"]
-            if row_domains["start"] <= row_contacts["abscissa position"] <= row_domains["stop"]:
+            if row_domains["start"] <= row_contacts["second partner position"] <= row_domains["stop"]:
                 acceptors_regions[idx] = row_domains["domain"]
-    df.insert(2, "ordinate domains", pd.DataFrame(donors_regions))
-    df.insert(5, "abscissa domains", pd.DataFrame(acceptors_regions))
+    df.insert(2, "first partner domain", pd.DataFrame(donors_regions))
+    df.insert(5, "second partner domain", pd.DataFrame(acceptors_regions))
     df.to_csv(path, index=False)
     logging.info(f"Pairs residues contacts updated with domains saved: {path}")
     return df
@@ -514,7 +515,7 @@ def acceptors_domains_involved(df, domains, out_dir, bn, roi, fmt, res_dist, par
     """
     data = {}
     for _, row_domains in domains.iterrows():
-        tmp = df[df["abscissa domains"] == row_domains["domain"]]
+        tmp = df[df["second partner domain"] == row_domains["domain"]]
         if not tmp.empty:
             if not row_domains["domain"] in data:
                 data[row_domains["domain"]] = 0
