@@ -346,7 +346,7 @@ def heatmap_distances_nb_contacts(df):
     return source_distances, source_nb_contacts
 
 
-def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
+def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     """
     Create the heatmap of contacts between residues.
 
@@ -354,8 +354,6 @@ def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
     :type contacts: dict
     :param params: the parameters used in the previous trajectory contacts analysis.
     :type params: dict
-    :param bn: the basename.
-    :type bn: str
     :param out_dir: the output directory.
     :type out_dir: str
     :param output_fmt: the output format for the heatmap.
@@ -376,7 +374,7 @@ def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
                           linewidths=0.5, xticklabels=True, yticklabels=True)
     heatmap.figure.axes[-1].yaxis.label.set_size(15)
     plot = heatmap.get_figure()
-    title = f"Contact residues median distance: {params['sample'] if 'sample' in params else bn}"
+    title = f"Contact residues median distance: {params['sample']}"
     plt.suptitle(title, fontsize="large", fontweight="bold")
     md_duration = f"MD length: {params['MD duration']}. " if "MD duration" in params else ""
     subtitle = f"{md_duration}Count of residues atoms in contact are displayed in the squares."
@@ -391,7 +389,7 @@ def heatmap_contacts(contacts, params, bn, out_dir, output_fmt, lim_roi):
     plt.title(subtitle)
     plt.xlabel("Whole protein residues", fontweight="bold")
     plt.ylabel("Region Of Interest residues", fontweight="bold")
-    out_path = os.path.join(out_dir, f"heatmap_distances_{bn}.{output_fmt}")
+    out_path = os.path.join(out_dir, f"heatmap_distances_{params['sample'].replace(' ', '_')}.{output_fmt}")
     plot.savefig(out_path)
     # clear the plot for the next use of the function
     plt.clf()
@@ -464,7 +462,7 @@ def outliers_contacts(df, res_dist_thr):
     return df
 
 
-def update_domains(df, domains, path):
+def update_domains(df, domains, out_dir, params):
     """
     Get the domains for pairs acceptor and donor.
 
@@ -472,8 +470,10 @@ def update_domains(df, domains, path):
     :type df: pd.Dataframe
     :param domains: the domains coordinates.
     :type domains: pd.Dataframe
-    :param path: the path of the outliers contacts updated with the domains CSV file.
-    :type path: str
+    :param out_dir: the path output directory.
+    :type out_dir: str
+    :param params: the parameters used in the previous trajectory contacts analysis.
+    :type params: dict
     :return: the pairs contacts dataframe updated with the regions.
     :rtype: pd.Dataframe
     """
@@ -487,12 +487,13 @@ def update_domains(df, domains, path):
                 acceptors_regions[idx] = row_domains["domain"]
     df.insert(2, "first partner domain", pd.DataFrame(donors_regions))
     df.insert(5, "second partner domain", pd.DataFrame(acceptors_regions))
-    df.to_csv(path, index=False)
-    logging.info(f"Pairs residues contacts updated with domains saved: {path}")
+    out_path = os.path.join(out_dir, f"outliers_{params['sample'].replace(' ', '_')}.csv")
+    df.to_csv(out_path, index=False)
+    logging.info(f"Pairs residues contacts updated with domains saved: {out_path}")
     return df
 
 
-def acceptors_domains_involved(df, domains, out_dir, bn, roi, fmt, res_dist, params):
+def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist):
     """
     Create the plot of contacts by regions.
 
@@ -502,16 +503,14 @@ def acceptors_domains_involved(df, domains, out_dir, bn, roi, fmt, res_dist, par
     :type domains: pd.Dataframe
     :param out_dir: the path of the output directory.
     :type out_dir: str
-    :param bn: basename for the sample.
-    :type bn: str
+    :param params: the parameters used in the previous trajectory contacts analysis.
+    :type params: dict
     :param roi: the region of interest.
     :type roi: str
     :param fmt: the format for the plot.
     :type fmt: str
     :param res_dist: the maximal residues distance in the amino acids chain.
     :type res_dist: int
-    :param params: the parameters of the trajectory analysis
-    :type params: dict
     """
     data = {}
     for _, row_domains in domains.iterrows():
@@ -542,7 +541,7 @@ def acceptors_domains_involved(df, domains, out_dir, bn, roi, fmt, res_dist, par
               f"frames with contacts in frames range {params['frames']['min']} to {params['frames']['max']}"
               f"{md_duration}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
-    path = os.path.join(out_dir, f"outliers_{bn}.{fmt}")
+    path = os.path.join(out_dir, f"outliers_{params['sample'].replace(' ', '_')}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
     logging.info(f"Contacts by domain plot saved: {path}")
 
@@ -611,8 +610,6 @@ if __name__ == "__main__":
     create_log(args.log, args.log_level, args.out)
     check_optional_args(args.domains, args.embedded_domains, args.residues_distance)
 
-    # get the input basename
-    basename = os.path.splitext(os.path.basename(args.input))[0]
     # get the Region Of Interest if specified
     if args.roi:
         roi_limits = extract_roi(args.roi)
@@ -641,7 +638,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # get the heatmaps of validated contacts by residues
-    heatmap_contacts(residues_contacts, parameters_contacts_analysis, basename, args.out, args.format, roi_limits)
+    heatmap_contacts(residues_contacts, parameters_contacts_analysis, args.out, args.format, roi_limits)
 
     outliers = outliers_contacts(residues_contacts, args.residues_distance)
     logging.info(f"{len(outliers)} unique residues pairs contacts (<= "
@@ -653,8 +650,8 @@ if __name__ == "__main__":
         # load and format the domains file
         domains_data = get_domains(args.domains, args.embedded_domains)
         # get the outliers contacts
-        outliers = update_domains(outliers, domains_data, os.path.join(args.out, f"outliers_{basename}.csv"))
+        outliers = update_domains(outliers, domains_data, args.out, parameters_contacts_analysis)
 
         # by acceptor domain
-        acceptors_domains_involved(outliers, domains_data, args.out, basename, args.roi, args.format,
-                                   args.residues_distance, parameters_contacts_analysis)
+        acceptors_domains_involved(outliers, domains_data, args.out, parameters_contacts_analysis, args.roi,
+                                   args.format, args.residues_distance)
