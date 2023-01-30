@@ -69,4 +69,4 @@ on the whole protein.
 - a plot of the contacts with he minimal residues distance for the whole protein or the region of interest if used on 
 the whole protein:
 
-![contacts heatmap](.img/outliers_contacts.svg)
+![contacts heatmap](.img/outliers.svg)
