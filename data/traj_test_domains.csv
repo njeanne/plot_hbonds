@@ -1,0 +1,8 @@
+domain,start,end,color
+Methyltransferase,59,239,#0000b6
+Y domain,240,439,#02eded
+Protease,440,610,#00ea00
+Hinge,714,793,#ab0000
+X domain,800,957,#e1e100
+Helicase,975,1219,#e77504
+RdRP,1222,1708,#7a147a
