@@ -15,10 +15,9 @@ import os
 import re
 import sys
 
+import matplotlib
+matplotlib.use('Agg')
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-from matplotlib import rcParams
 import seaborn as sns
 import yaml
 
@@ -368,14 +367,14 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     # increase the size of the heatmap if too much entries
     factor = int(len(source_distances) / 40) if len(source_distances) / 40 >= 1 else 1
     logging.debug(f"{len(source_distances)} entries, the size of the figure is multiplied by a factor {factor}.")
-    rcParams["figure.figsize"] = 15 * factor, 12 * factor
+    matplotlib.rcParams["figure.figsize"] = 15 * factor, 12 * factor
     # create the heatmap
     heatmap = sns.heatmap(source_distances, annot=source_nb_contacts, cbar_kws={"label": "Distance (\u212B)"},
                           linewidths=0.5, xticklabels=True, yticklabels=True)
     heatmap.figure.axes[-1].yaxis.label.set_size(15)
     plot = heatmap.get_figure()
     title = f"Contact residues median distance: {params['sample']}"
-    plt.suptitle(title, fontsize="large", fontweight="bold")
+    matplotlib.plt.suptitle(title, fontsize="large", fontweight="bold")
     md_duration = f"MD length: {params['MD duration']}. " if "MD duration" in params else ""
     subtitle = f"{md_duration}Count of residues atoms in contact are displayed in the squares."
     if lim_roi:
@@ -386,13 +385,13 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     if params["frames"]:
         subtitle = f"{subtitle}\n{params['proportion contacts']}% of frames with contacts in frames range " \
                    f"{params['frames']['min']} to {params['frames']['max']}"
-    plt.title(subtitle)
-    plt.xlabel("Whole protein residues", fontweight="bold")
-    plt.ylabel("Region Of Interest residues", fontweight="bold")
+    matplotlib.plt.title(subtitle)
+    matplotlib.plt.xlabel("Whole protein residues", fontweight="bold")
+    matplotlib.plt.ylabel("Region Of Interest residues", fontweight="bold")
     out_path = os.path.join(out_dir, f"heatmap_distances_{params['sample'].replace(' ', '_')}.{output_fmt}")
     plot.savefig(out_path)
     # clear the plot for the next use of the function
-    plt.clf()
+    matplotlib.plt.clf()
     logging.info(f"\tmedian distance heatmap saved: {out_path}")
 
 
@@ -525,12 +524,12 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
     # set the seaborn plots style and size
     sns.set_style("darkgrid")
     sns.set_context("poster", rc={"grid.linewidth": 2})
-    fig, ax = plt.subplots(figsize=(15, 15))
+    fig, ax = matplotlib.plt.subplots(figsize=(15, 15))
     sns.barplot(data=source, ax=ax, x="domain", y="number of contacts", color="blue")
     ax.set_xticklabels(source["domain"], rotation=45, horizontalalignment="right")
     ax.set_xlabel(None)
     ax.set_ylabel(f"{'Region Of Interest ' + roi if roi else 'Whole protein'} residues contacts", fontweight="bold")
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(1))
     ax.text(x=0.5, y=1.1, s=f"{params['sample'] if 'sample' in params else bn}: outliers contacts by domains\nbetween "
                             f"the {'Region Of Interest ' + roi if roi else 'whole protein'} and the whole protein",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
