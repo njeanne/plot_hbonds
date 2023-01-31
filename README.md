@@ -61,7 +61,7 @@ the whole protein.
 The script outputs are:
 - a heatmap of the contacts:
 
-![contacts heatmap](.img/heatmap.svg)
+![contacts heatmap](doc/_static/heatmap.svg)
 
 And if the `--domains` option is used: 
 - a CSV file of the contacts with the minimal residues distance for the whole protein or the region of interest if used 
@@ -69,4 +69,4 @@ on the whole protein.
 - a plot of the contacts with he minimal residues distance for the whole protein or the region of interest if used on 
 the whole protein:
 
-![contacts heatmap](.img/outliers.svg)
+![contacts heatmap](doc/_static/outliers.svg)
