@@ -16,7 +16,7 @@ import re
 import sys
 
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import pandas as pd
 import seaborn as sns
 import yaml
@@ -530,7 +530,7 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
     ax.set_xlabel(None)
     ax.set_ylabel(f"{'Region Of Interest ' + roi if roi else 'Whole protein'} residues contacts", fontweight="bold")
     ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(1))
-    ax.text(x=0.5, y=1.1, s=f"{params['sample'] if 'sample' in params else bn}: outliers contacts by domains\nbetween "
+    ax.text(x=0.5, y=1.1, s=f"{params['sample']}: outliers contacts by domains\nbetween "
                             f"the {'Region Of Interest ' + roi if roi else 'whole protein'} and the whole protein",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
     md_duration = f", MD length: {params['MD duration']}." if "MD duration" in params else ""
