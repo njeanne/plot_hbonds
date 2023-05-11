@@ -16,7 +16,8 @@ import re
 import sys
 
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import yaml
@@ -165,7 +166,7 @@ def get_contacts_analysis_parameters(parameters_path):
                 for p_key_2, p_value_2 in p_value.items():
                     logging.info(f"\t\t{p_key_2}:\t{p_value_2}")
             else:
-                logging.info(f"\t{p_key}:\t{p_value}")
+                logging.info(f"\t{p_key}:\t{', '.join(p_value) if p_key == 'trajectory files processed' else p_key}")
     return parameters
 
 
@@ -360,7 +361,7 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     :param lim_roi: the region of interest limits for the heatmap.
     :type lim_roi: list
     """
-    logging.info("Computing contacts heatmap..")
+    logging.info("Computing the contacts heatmap..")
     # create the distances and number of contacts dataframes to produce the heatmap
     source_distances, source_nb_contacts = heatmap_distances_nb_contacts(contacts)
 
@@ -374,24 +375,24 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     heatmap.figure.axes[-1].yaxis.label.set_size(15)
     plot = heatmap.get_figure()
     title = f"Contact residues median distance: {params['sample']}"
-    matplotlib.plt.suptitle(title, fontsize="large", fontweight="bold")
+    plt.suptitle(title, fontsize="large", fontweight="bold")
     md_duration = f"MD length: {params['MD duration']}. " if "MD duration" in params else ""
     subtitle = f"{md_duration}Count of residues atoms in contact are displayed in the squares."
     if lim_roi:
-        subtitle = f"{subtitle}\nRegion Of Interest: {lim_roi[0]} to {lim_roi[1]} ({params['protein length']} " \
+        subtitle = f"{subtitle}\nRegion Of Interest: {lim_roi[0]} to {lim_roi[1]} ({params['residues']} " \
                    f"residues in the protein)"
     else:
-        subtitle = f"{subtitle}\nRegion Of Interest: 1 to {params['protein length']} (whole protein)"
+        subtitle = f"{subtitle}\nRegion Of Interest: 1 to {params['residues']} (whole protein)"
     if params["frames"]:
-        subtitle = f"{subtitle}\n{params['proportion contacts']}% of frames with contacts in frames range " \
-                   f"{params['frames']['min']} to {params['frames']['max']}"
-    matplotlib.plt.title(subtitle)
-    matplotlib.plt.xlabel("Whole protein residues", fontweight="bold")
-    matplotlib.plt.ylabel("Region Of Interest residues", fontweight="bold")
+        subtitle = f"{subtitle}\n{params['parameters']['proportion contacts']}% of contacts in {params['frames']} " \
+                   f"frames."
+    plt.title(subtitle)
+    plt.xlabel("Whole protein residues", fontweight="bold")
+    plt.ylabel("Region Of Interest residues", fontweight="bold")
     out_path = os.path.join(out_dir, f"heatmap_distances_{params['sample'].replace(' ', '_')}.{output_fmt}")
     plot.savefig(out_path)
     # clear the plot for the next use of the function
-    matplotlib.plt.clf()
+    plt.clf()
     logging.info(f"\tmedian distance heatmap saved: {out_path}")
 
 
@@ -524,7 +525,7 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
     # set the seaborn plots style and size
     sns.set_style("darkgrid")
     sns.set_context("poster", rc={"grid.linewidth": 2})
-    fig, ax = matplotlib.plt.subplots(figsize=(15, 15))
+    fig, ax = plt.subplots(figsize=(15, 15))
     sns.barplot(data=source, ax=ax, x="domain", y="number of contacts", color="blue")
     ax.set_xticklabels(source["domain"], rotation=45, horizontalalignment="right")
     ax.set_xlabel(None)
@@ -533,12 +534,11 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
     ax.text(x=0.5, y=1.1, s=f"{params['sample']}: outliers contacts by domains\nbetween "
                             f"the {'Region Of Interest ' + roi if roi else 'whole protein'} and the whole protein",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
-    md_duration = f", MD length: {params['MD duration']}." if "MD duration" in params else ""
+    md_duration = f", MD: {params['parameters']['time']}" if "time" in params['parameters'] else ""
     ax.text(x=0.5, y=1.0,
-            s=f"Maximal atoms distance: {params['maximal atoms distance']} \u212B, minimal angle cut-off "
-              f"{params['angle cutoff']}°, minimal residues distance: {res_dist}\n{params['proportion contacts']}% of "
-              f"frames with contacts in frames range {params['frames']['min']} to {params['frames']['max']}"
-              f"{md_duration}",
+            s=f"Maximal atoms distance: {params['parameters']['maximal atoms distance']} \u212B, minimal angle cut-off "
+              f"{params['parameters']['angle cutoff']}°, minimal residues distance: {res_dist}\n"
+              f"{params['parameters']['proportion contacts']}% of contacts in {params['frames']} frames{md_duration}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
     path = os.path.join(out_dir, f"outliers_{params['sample'].replace(' ', '_')}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
@@ -641,9 +641,10 @@ if __name__ == "__main__":
 
     outliers = outliers_contacts(residues_contacts, args.residues_distance)
     logging.info(f"{len(outliers)} unique residues pairs contacts (<= "
-                 f"{parameters_contacts_analysis['maximal atoms distance']} \u212B) with a distance of at least "
-                 f"{args.residues_distance} residues{' in the region of interest '+args.roi if args.roi else ''} "
-                 f"(residues pair may have multiple atoms contacts).")
+                 f"{parameters_contacts_analysis['parameters']['maximal atoms distance']} \u212B) with a distance of "
+                 f"at least {args.residues_distance} residues"
+                 f"{' in the region of interest '+args.roi if args.roi else ''} (residues pair may have multiple atoms "
+                 f"contacts).")
 
     if args.domains:
         # load and format the domains file
