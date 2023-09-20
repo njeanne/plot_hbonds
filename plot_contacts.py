@@ -7,7 +7,7 @@ Created on 12 Sep. 2022
 __author__ = "Nicolas JEANNE"
 __copyright__ = "GNU General Public License"
 __email__ = "jeanne.n@chu-toulouse.fr"
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 import argparse
 import logging
@@ -24,13 +24,14 @@ import yaml
 
 
 def create_log(log_path, level, out_dir):
-    """Create the log as a text file and as a stream.
+    """
+    Create the log as a text file and as a stream.
 
     :param log_path: the path of the log.
     :type log_path: str
     :param level: the level og the log.
     :type level: str
-    :param out_dir: the results directory path.
+    :param out_dir: the result directory path.
     :type out_dir: str
     """
     os.makedirs(out_dir, exist_ok=True)
@@ -44,7 +45,7 @@ def create_log(log_path, level, out_dir):
 
     log_level = log_level_dict["INFO"]
     if level:
-        log_level = log_level_dict[args.log_level]
+        log_level = log_level_dict[level]
 
     if os.path.exists(log_path):
         os.remove(log_path)
@@ -60,9 +61,9 @@ def create_log(log_path, level, out_dir):
 def check_optional_args(args_domains, args_embedded_domains, args_residues_distance):
     """Check the combination of optional arguments
 
-    :param args_domains: the domains argument.
+    :param args_domains: the domain's argument.
     :type args_domains: str
-    :param args_embedded_domains: the embedded domains argument.
+    :param args_embedded_domains: the embedded domain's argument.
     :type args_embedded_domains: bool
     :param args_residues_distance: the value of the residues distance argument.
     :type args_residues_distance: int
@@ -76,11 +77,11 @@ def check_optional_args(args_domains, args_embedded_domains, args_residues_dista
 
 def get_domains(domains_path, use_embedded):
     """
-    Load the domains file and fill in domains that are not covered.
+    Load the domain file and fill in domains that are not covered.
 
     :param domains_path: the path to the domains file.
     :type domains_path: str
-    :param use_embedded: if an embedded domain should be use as a domain or if only the embedding domain should be
+    :param use_embedded: if an embedded domain should be used as a domain or if only the embedding domain should be
     processed.
     :type use_embedded: bool
     :return: the filled-in domains data frame.
@@ -166,18 +167,18 @@ def get_contacts_analysis_parameters(parameters_path):
                 for p_key_2, p_value_2 in p_value.items():
                     logging.info(f"\t\t{p_key_2}:\t{p_value_2}")
             else:
-                logging.info(f"\t{p_key}:\t{', '.join(p_value) if p_key == 'trajectory files processed' else p_key}")
+                logging.info(f"\t{p_key}:\t{', '.join(p_value) if p_key == 'trajectory files processed' else p_value}")
     return parameters
 
 
 def extract_roi(roi_to_extract):
     """
-    Extract the start and stop coordinates of the region of interest (roi).
+    Extract the region of interest (roi) start's and stop's coordinates.
 
-    :param roi_to_extract: the coordinates ot the region of interest, as 100-200 i.e.
+    :param roi_to_extract: the coordinates ot the region of interest, as 100-200 i.e.,
     :type roi_to_extract: str
     :raises ArgumentTypeError: is not between 0.0 and 100.0
-    :return: the start and stop coordinates of the region of interest.
+    :return: the region of interest (roi) start's and stop's coordinates.
     :rtype: list
     """
     pattern_roi_to_extract = re.compile("(\\d+)-(\\d+)")
@@ -192,18 +193,19 @@ def extract_roi(roi_to_extract):
 
 def get_residues_in_contact(df):
     """
-    Reduce the contacts to residues, if 2 residues have multiple atoms in contacts, the pair of atoms with the smallest
-    distance will be kept, then create a column with the number of contacts between this 2 residues and finally sort
+    Reduce the contacts to residues if two residues have multiple atoms in contacts, the pair of atoms with the smallest
+    distance will be kept, then create a column with the number of contacts between those two residues and finally sort
     the data by position of the first residue in the interaction.
 
     :param df: the contacts from the trajectory analysis.
     :type df: pandas.Dataframe
-    :return: the reduced dataframe with the minimal distance value of all the couples of first partner - second partner
-    and the column with the number of contacts.
+    :return: the reduced dataframe with the minimal distance value of all the couples of first partners - second
+    partners and the column with the number of contacts.
     :rtype: pd.Dataframe
     """
-    # combinations is used to register the combination of first partner and second partner, in this specific order, then
-    # select only the value with the minimal contact distance and also the number of contacts for this pair of residues
+    # combinations were used to register the combination of first partner and second partner, in this specific order,
+    # then select only the value with the minimal contact distance and also the number of contacts for this pair of
+    # residues
     combinations = []
     idx_to_remove = []
     combinations_nb_contacts = []
@@ -235,13 +237,13 @@ def extract_residues_contacts(path_contacts, roi):
     and acceptors.
 
     :param path_contacts: the path to the contacts CSV path.
-    :type path_contacts: str
+    :type path_contacts: Str
     :param roi: the list of the start and end positions of the Region Of Interest.
-    :type roi: list
+    :type roi: List
     :return: the filtered contacts.
-    :rtype: pd.Dataframe
+    :rtype: Pd.Dataframe
     """
-    # load the contacts file
+    # load the contacts' file
     df_contacts_all = pd.read_csv(path_contacts, sep=",")
     logging.info(f"{len(df_contacts_all)} atoms contacts in the input data (residues pairs may have multiple atoms "
                  f"contacts).")
@@ -279,7 +281,7 @@ def extract_residues_contacts(path_contacts, roi):
             first_residue.append(row["donor residue"])
             second_position.append(row["acceptor position"])
             second_residue.append(row["acceptor residue"])
-    # loose the notions of donor and acceptor to use first and second partner
+    # lose the notions of donor and acceptor to use first and second partner
     df_tmp = pd.DataFrame({"contact": df_contacts_all["contact"],
                            "first partner position": first_position,
                            "first partner residue": first_residue,
@@ -300,7 +302,7 @@ def heatmap_distances_nb_contacts(df):
 
     :param df: the initial dataframe
     :type df: pd.Dataframe
-    :return: the dataframe of distances and the dataframe of the number of contacts.
+    :return: the distances dataframe and the number of contacts dataframe.
     :rtype: pd.Dataframe, pd.Dataframe
     """
 
@@ -365,7 +367,7 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     # create the distances and number of contacts dataframes to produce the heatmap
     source_distances, source_nb_contacts = heatmap_distances_nb_contacts(contacts)
 
-    # increase the size of the heatmap if too much entries
+    # increase the size of the heatmap if too many entries
     factor = int(len(source_distances) / 40) if len(source_distances) / 40 >= 1 else 1
     logging.debug(f"{len(source_distances)} entries, the size of the figure is multiplied by a factor {factor}.")
     matplotlib.rcParams["figure.figsize"] = 15 * factor, 12 * factor
@@ -468,7 +470,7 @@ def update_domains(df, domains, out_dir, params):
 
     :param df: the dataframe of unique residues pairs contacts.
     :type df: pd.Dataframe
-    :param domains: the domains coordinates.
+    :param domains: the domain's coordinates.
     :type domains: pd.Dataframe
     :param out_dir: the path output directory.
     :type out_dir: str
@@ -616,6 +618,7 @@ if __name__ == "__main__":
         roi_limits = None
 
     # load the contacts analysis parameters
+    parameters_contacts_analysis = None
     try:
         parameters_contacts_analysis = get_contacts_analysis_parameters(args.parameters)
     except ImportError as exc:
@@ -623,6 +626,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # extract the contacts
+    residues_contacts = None
     try:
         residues_contacts = extract_residues_contacts(args.input, roi_limits)
     except argparse.ArgumentTypeError as exc:

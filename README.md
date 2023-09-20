@@ -4,10 +4,10 @@ From a CSV of the amino acids contacts file and a YAML parameters file, produced
 trajectories_contacts.py (https://github.com/njeanne/trajectories_contacts), create a heatmap representing the 
 residues contacts.
 
-If a domains CSV file is used with the option "--domains", a plot and a CSV file of the contacts by domains will be 
-produced. An example of the domains CSV file is provided in data/traj_test_domains.csv
+If a domains CSV file is used with the option `--domains`, a plot and a CSV file of the contacts by domains will be 
+produced. An example of the domains CSV file is provided in `data/traj_test_domains.csv`
 For this CSV, if some domains are embedded in other domains, they can be displayed in the outputs with the option 
-"--use-embedded".
+`--use-embedded`.
 
 ## Conda environment
 
@@ -50,11 +50,11 @@ conda activate python3
 conda deactivate
 ```
 
-The optional parameter used are:
+The optional parameter used:
 - `--roi`: to the region of interest the user wants to focus on.
-- `--domains`: to produce a plot of the number of contacts of the whole protein or the region of interest if used on 
+- `--domains`: to produce a number of contacts plot of the whole protein or the region of interest if used on 
 the whole protein.
-- `--residues-distance`: the minimal number of residues between 2 residues to validate a contact.
+- `--residues-distance`: the minimal number of residues between two residues to validate a contact.
 
 ## Outputs
 
@@ -66,7 +66,7 @@ The script outputs are:
 And if the `--domains` option is used: 
 - a CSV file of the contacts with the minimal residues distance for the whole protein or the region of interest if used 
 on the whole protein.
-- a plot of the contacts with he minimal residues distance for the whole protein or the region of interest if used on 
+- a plot of the contacts with the minimal residues distance for the whole protein or the region of interest if used on 
 the whole protein:
 
 ![contacts heatmap](doc/_static/outliers.svg)
