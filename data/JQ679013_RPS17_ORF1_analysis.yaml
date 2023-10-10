@@ -1,0 +1,19 @@
+atoms: 27119
+frames: 5000
+frames selection:
+  JQ679013_RPS17_ORF1_0_MD-30M.nc:
+    begin: 10000
+    end: 15000
+molecules: 1
+parameters:
+  angle cutoff: 135
+  maximal atoms distance: 3.0
+  proportion contacts: 50.0
+  time: 60 ns
+pickle hydrogen bonds: /tmpdir/jeanne/MD/analysis/contacts/insertions/MD-30M/JQ679013_RPS17_ORF1_analysis.pkl
+residues: 1765
+sample: JQ679013_RPS17_ORF1
+size Gb: 3.0307844281196594
+topology file: JQ679013_RPS17_ORF1_0.parm
+trajectory files processed:
+- JQ679013_RPS17_ORF1_0_MD-30M.nc

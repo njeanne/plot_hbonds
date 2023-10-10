@@ -7,7 +7,7 @@ Created on 12 Sep. 2022
 __author__ = "Nicolas JEANNE"
 __copyright__ = "GNU General Public License"
 __email__ = "jeanne.n@chu-toulouse.fr"
-__version__ = "2.0.1"
+__version__ = "2.1.0"
 
 import argparse
 import logging
@@ -209,6 +209,7 @@ def get_residues_in_contact(df):
     combinations = []
     idx_to_remove = []
     combinations_nb_contacts = []
+    combinations_atoms_contacts = []
     for _, row in df.iterrows():
         first = f"{row['first partner position']}{row['first partner residue']}"
         second = f"{row['second partner position']}{row['second partner residue']}"
@@ -225,8 +226,11 @@ def get_residues_in_contact(df):
             if tmp_index_to_remove:
                 idx_to_remove = idx_to_remove + tmp_index_to_remove
             combinations_nb_contacts.append(len(tmp_df.index))
+            combinations_atoms_contacts.append(list(tmp_df["contact"]))
     df = df.drop(idx_to_remove)
-    df["atoms contacts"] = combinations_nb_contacts
+    df["number atoms contacts"] = combinations_nb_contacts
+    df["atoms contacts"] = combinations_atoms_contacts
+    df["contact"] = combinations
     df = df.sort_values(by=["first partner position"])
     return df
 
@@ -336,7 +340,7 @@ def heatmap_distances_nb_contacts(df):
             if second_position not in nb_contacts:
                 nb_contacts[second_position] = []
             contacts = df.loc[(df["first partner position"] == first_position) & (
-                        df["second partner position"] == second_position), "atoms contacts"]
+                        df["second partner position"] == second_position), "number atoms contacts"]
             if not contacts.empty:
                 nb_contacts[second_position].append(contacts.values[0])
             else:
@@ -521,7 +525,7 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
             if not row_domains["domain"] in data:
                 data[row_domains["domain"]] = 0
             for _, row_tmp in tmp.iterrows():
-                data[row_domains["domain"]] += row_tmp["atoms contacts"]
+                data[row_domains["domain"]] += row_tmp["number atoms contacts"]
     source = pd.DataFrame.from_dict({"domain": data.keys(), "number of contacts": data.values()})
 
     # set the seaborn plots style and size

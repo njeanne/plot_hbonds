@@ -7,7 +7,7 @@ residues contacts.
 If a domains CSV file is used with the option `--domains`, a plot and a CSV file of the contacts by domains will be 
 produced. An example of the domains CSV file is provided in `data/traj_test_domains.csv`
 For this CSV, if some domains are embedded in other domains, they can be displayed in the outputs with the option 
-`--use-embedded`.
+`--embedded-domains`.
 
 ## Conda environment
 
@@ -26,26 +26,26 @@ conda activate python3
 
 The script can be tested with the test data provided in the `data` directory, which contains the output CSV and the 
 YAML parameters files of the [trajectory_contacts](https://github.com/njeanne/trajectories_contacts) script, 
-respectively `contacts_by_residue_traj_test.csv` and `traj_test_analysis_parameters.yaml`. The commands are:
+respectively `contacts_by_residue_JQ679013_RPS17_ORF1.csv` and `JQ679013_RPS17_ORF1_analysis.yaml`. The commands are:
 
 ```shell script
 conda activate python3
 
 ./plot_contacts.py --out results --roi 682-840 --format svg\
---parameters data/traj_test_analysis_parameters.yaml data/contacts_by_residue_traj_test.csv
+--parameters data/JQ679013_RPS17_ORF1_analysis.yaml data/contacts_by_residue_JQ679013_RPS17_ORF1.csv
 
 conda deactivate
 ```
 
-An optional domains CSV file can also be provided with the `--domains` option, `data/traj_test_domains.csv`. The 
+An optional domains CSV file can also be provided with the `--domains` option, `data/JQ679013_RPS17_ORF1_domains.csv`. The 
 commands are:
 
 ```shell script
 conda activate python3
 
 ./plot_contacts.py --out results --roi 682-840  --format svg \
---domains data/traj_test_domains.csv --residues-distance 10 \
---parameters data/traj_test_analysis_parameters.yaml  data/contacts_by_residue_traj_test.csv
+--domains data/JQ679013_RPS17_ORF1_domains.csv --residues-distance 10 \
+--parameters data/JQ679013_RPS17_ORF1_analysis.yaml  data/contacts_by_residue_JQ679013_RPS17_ORF1.csv
 
 conda deactivate
 ```

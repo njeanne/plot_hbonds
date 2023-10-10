@@ -1,9 +1,0 @@
-MD duration: 60 ns
-angle cutoff: 135
-frames:
-  max: 120000
-  min: 10000
-maximal atoms distance: 3.0
-proportion contacts: 50.0
-protein length: 1708
-sample: trajectory test
