@@ -226,7 +226,7 @@ def get_residues_in_contact(df):
             if tmp_index_to_remove:
                 idx_to_remove = idx_to_remove + tmp_index_to_remove
             combinations_nb_contacts.append(len(tmp_df.index))
-            combinations_atoms_contacts.append(list(tmp_df["contact"]))
+            combinations_atoms_contacts.append(" ".join(list(tmp_df["contact"])))
     df = df.drop(idx_to_remove)
     df["number atoms contacts"] = combinations_nb_contacts
     df["atoms contacts"] = combinations_atoms_contacts
