@@ -13,6 +13,7 @@ import argparse
 import logging
 import os
 import re
+import statistics
 import sys
 
 import matplotlib
@@ -208,29 +209,43 @@ def get_residues_in_contact(df):
     # residues
     combinations = []
     idx_to_remove = []
+    median_distances = []
     combinations_nb_contacts = []
     combinations_atoms_contacts = []
-    for _, row in df.iterrows():
+    combinations_atoms_contacts_distances = []
+    for idx, row in df.iterrows():
         first = f"{row['first partner position']}{row['first partner residue']}"
         second = f"{row['second partner position']}{row['second partner residue']}"
-        if f"{first}_{second}" not in combinations:
+        if f"{first}_{second}" not in combinations and f"{second}_{first}" not in combinations:
             combinations.append(f"{first}_{second}")
             tmp_df = df[(df["first partner position"] == row["first partner position"]) & (
                         df["second partner position"] == row["second partner position"]) | (
                                     df["second partner position"] == row["second partner position"]) & (
                                     df["first partner position"] == row["first partner position"])]
-            # get the index of the minimal distance
-            idx_min = tmp_df[["median distance"]].idxmin()
-            # record the index to remove of the other rows of the same combinations positions
-            tmp_index_to_remove = list(tmp_df.index.drop(idx_min))
-            if tmp_index_to_remove:
-                idx_to_remove = idx_to_remove + tmp_index_to_remove
+            # get the median distance of all the atom contacts between the two residues
+            median_distances.append(statistics.median(tmp_df["median distance"]))
             combinations_nb_contacts.append(len(tmp_df.index))
-            combinations_atoms_contacts.append(" ".join(list(tmp_df["contact"])))
+            contacts_str = None
+            distance_contacts = []
+            for _, tmp_df_row in tmp_df.iterrows():
+                if contacts_str is None:
+                    contacts_str = f"{tmp_df_row['contact']}"
+                else:
+                    contacts_str = f"{contacts_str};{tmp_df_row['contact']}"
+                distance_contacts.append(str(tmp_df_row["median distance"]))
+            combinations_atoms_contacts.append(contacts_str)
+            combinations_atoms_contacts_distances.append(";".join(distance_contacts))
+        else:
+            idx_to_remove.append(idx)
     df = df.drop(idx_to_remove)
+    df["contact"] = combinations
+    df["median distance"] = median_distances
     df["number atoms contacts"] = combinations_nb_contacts
     df["atoms contacts"] = combinations_atoms_contacts
-    df["contact"] = combinations
+    df["atoms contacts distances"] = combinations_atoms_contacts_distances
+    # rename the columns
+    df.rename(columns={"median distance": "median contacts distance"}, inplace=True)
+    df.rename(columns={"contact": "residues in contact"}, inplace=True)
     df = df.sort_values(by=["first partner position"])
     return df
 
@@ -331,7 +346,7 @@ def heatmap_distances_nb_contacts(df):
             if second_position not in distances:
                 distances[second_position] = []
             dist = df.loc[(df["first partner position"] == first_position) & (
-                        df["second partner position"] == second_position), "median distance"]
+                        df["second partner position"] == second_position), "median contacts distance"]
             if not dist.empty:
                 distances[second_position].append(dist.values[0])
             else:
