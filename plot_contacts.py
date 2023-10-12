@@ -198,7 +198,7 @@ def get_residues_in_contact(df):
     is used as reference, the median distance between the ROI (Region Of Interest) residue atoms and the atoms of its
     partner will be added. All their atoms contacts identifiers will be regrouped in a single column with semicolon
     separators. Same thing for their median distances during the molecular dynamics simulation and the type of the
-    residue's atom in the ROI.
+    residue's atom in the ROI (donor or acceptor).
 
     :param df: the contacts from the trajectory analysis.
     :type df: pandas.Dataframe
@@ -337,11 +337,11 @@ def heatmap_distances_nb_contacts(df):
     nb_contacts = {}
     firsts = []
     seconds = []
-    unique_first_positions = sorted(list(set(df["first partner position"])))
+    unique_first_positions = sorted(list(set(df["ROI partner position"])))
     unique_second_positions = sorted(list(set(df["second partner position"])))
     for first_position in unique_first_positions:
         first = f"{first_position}" \
-                f"{df.loc[(df['first partner position'] == first_position), 'first partner residue'].values[0]}"
+                f"{df.loc[(df['ROI partner position'] == first_position), 'ROI partner residue'].values[0]}"
         if first not in firsts:
             firsts.append(first)
         for second_position in unique_second_positions:
@@ -405,12 +405,8 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     title = f"Contact residues median distance: {params['sample']}"
     plt.suptitle(title, fontsize="large", fontweight="bold")
     md_duration = f"MD length: {params['MD duration']}. " if "MD duration" in params else ""
-    subtitle = f"{md_duration}Count of residues atoms in contact are displayed in the squares."
-    if lim_roi:
-        subtitle = f"{subtitle}\nRegion Of Interest: {lim_roi[0]} to {lim_roi[1]} ({params['residues']} " \
-                   f"residues in the protein)"
-    else:
-        subtitle = f"{subtitle}\nRegion Of Interest: 1 to {params['residues']} (whole protein)"
+    subtitle = f"{md_duration}Count of residues atoms in contact are displayed in the squares.\nRegion Of Interest: " \
+                f"{lim_roi[0]} to {lim_roi[1]} ({params['residues']} residues in the protein)"
     if params["frames"]:
         subtitle = f"{subtitle}\n{params['parameters']['proportion contacts']}% of contacts in {params['frames']} " \
                    f"frames."
@@ -583,9 +579,12 @@ if __name__ == "__main__":
 
     Distributed on an "AS IS" basis without warranties or conditions of any kind, either express or implied.
 
-    From a CSV of the amino acids contacts file and a YAML parameters file, produced by the script 
-    trajectories_contacts.py (https://github.com/njeanne/trajectories_contacts), create a heatmap representing the 
+    From a CSV file of the contacts during a molecular dynamics simulation and a YAML parameters file, produced by the 
+    script trajectories_contacts.py (https://github.com/njeanne/trajectories_contacts), a heatmap representing the 
     residues contacts.
+    
+    A Region Of Interest (ROI) is defined with a range of amino acids selected in the protein, on the heatmap the 
+    contacts on the ordinate axis will be the ones belonging to this ROI.
 
     If a domains CSV file is used with the option "--domains", a plot and a CSV file of the contacts by domains will be 
     produced. An example of the domains CSV file is provided in data/traj_test_domains.csv
@@ -602,9 +601,9 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--parameters", required=True, type=str,
                         help="the path to the trajectory contacts analysis parameters (the YAML file in the results "
                              "directory of the trajectory_contacts.py script.")
-    parser.add_argument("-i", "--roi", required=False, type=str,
-                        help="the donors region of interest coordinates, the format should be two digits separated by "
-                             "an hyphen, i.e: '100-200'.")
+    parser.add_argument("-i", "--roi", required=True, type=str,
+                        help="the donors Region Of Interest (ROI) amino acids coordinates, the format should be two "
+                             "digits separated by an hyphen, i.e: '100-200'.")
     parser.add_argument("-f", "--format", required=False, default="svg",
                         choices=["eps", "jpg", "jpeg", "pdf", "pgf", "png", "ps", "raw", "svg", "svgz", "tif", "tiff"],
                         help="the output plots format: 'eps': 'Encapsulated Postscript', "
@@ -638,10 +637,7 @@ if __name__ == "__main__":
     check_optional_args(args.domains, args.embedded_domains, args.residues_distance)
 
     # get the Region Of Interest if specified
-    if args.roi:
-        roi_limits = extract_roi(args.roi)
-    else:
-        roi_limits = None
+    roi_limits = extract_roi(args.roi)
 
     # load the contacts analysis parameters
     parameters_contacts_analysis = None
