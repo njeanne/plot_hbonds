@@ -194,47 +194,52 @@ def extract_roi(roi_to_extract):
 
 def get_residues_in_contact(df):
     """
-    Reduce the contacts to residues if two residues have multiple atoms in contacts, the pair of atoms with the smallest
-    distance will be kept, then create a column with the number of contacts between those two residues and finally sort
-    the data by position of the first residue in the interaction.
+    Reduce the contacts to a residue contacts if two residues have multiple atoms in contacts. The residue in the ROI
+    is used as reference, the median distance between the ROI (Region Of Interest) residue atoms and the atoms of its
+    partner will be added. All their atoms contacts identifiers will be regrouped in a single column with semicolon
+    separators. Same thing for their median distances during the molecular dynamics simulation and the type of the
+    residue's atom in the ROI.
 
     :param df: the contacts from the trajectory analysis.
     :type df: pandas.Dataframe
-    :return: the reduced dataframe with the minimal distance value of all the couples of first partners - second
-    partners and the column with the number of contacts.
+    :return: the reduced dataframe with the added columns for the couples ROI partner - second partner.
     :rtype: pd.Dataframe
     """
-    # combinations were used to register the combination of first partner and second partner, in this specific order,
-    # then select only the value with the minimal contact distance and also the number of contacts for this pair of
-    # residues
+    # combinations were used to register the combination of ROI (Region Of Interest) partner and second partner, in
+    # this specific order, then select only the value with the minimal contact distance and also the number of contacts
+    # for this pair of residues
     combinations = []
     idx_to_remove = []
     median_distances = []
     combinations_nb_contacts = []
     combinations_atoms_contacts = []
     combinations_atoms_contacts_distances = []
+    first_partner_types = []
     for idx, row in df.iterrows():
-        first = f"{row['first partner position']}{row['first partner residue']}"
+        first = f"{row['ROI partner position']}{row['ROI partner residue']}"
         second = f"{row['second partner position']}{row['second partner residue']}"
         if f"{first}_{second}" not in combinations and f"{second}_{first}" not in combinations:
             combinations.append(f"{first}_{second}")
-            tmp_df = df[(df["first partner position"] == row["first partner position"]) & (
+            tmp_df = df[(df["ROI partner position"] == row["ROI partner position"]) & (
                         df["second partner position"] == row["second partner position"]) | (
                                     df["second partner position"] == row["second partner position"]) & (
-                                    df["first partner position"] == row["first partner position"])]
+                                    df["ROI partner position"] == row["ROI partner position"])]
             # get the median distance of all the atom contacts between the two residues
             median_distances.append(statistics.median(tmp_df["median distance"]))
             combinations_nb_contacts.append(len(tmp_df.index))
             contacts_str = None
-            distance_contacts = []
+            tmp_df_distance_contacts = []
+            tmp_df_partner_types = []
             for _, tmp_df_row in tmp_df.iterrows():
                 if contacts_str is None:
                     contacts_str = f"{tmp_df_row['contact']}"
                 else:
                     contacts_str = f"{contacts_str};{tmp_df_row['contact']}"
-                distance_contacts.append(str(tmp_df_row["median distance"]))
+                tmp_df_distance_contacts.append(str(tmp_df_row["median distance"]))
+                tmp_df_partner_types.append(tmp_df_row["ROI partner type"])
             combinations_atoms_contacts.append(contacts_str)
-            combinations_atoms_contacts_distances.append(";".join(distance_contacts))
+            combinations_atoms_contacts_distances.append(";".join(tmp_df_distance_contacts))
+            first_partner_types.append(";".join(tmp_df_partner_types))
         else:
             idx_to_remove.append(idx)
     df = df.drop(idx_to_remove)
@@ -243,10 +248,19 @@ def get_residues_in_contact(df):
     df["number atoms contacts"] = combinations_nb_contacts
     df["atoms contacts"] = combinations_atoms_contacts
     df["atoms contacts distances"] = combinations_atoms_contacts_distances
+    df["ROI partner types"] = first_partner_types
     # rename the columns
     df.rename(columns={"median distance": "median contacts distance"}, inplace=True)
     df.rename(columns={"contact": "residues in contact"}, inplace=True)
-    df = df.sort_values(by=["first partner position"])
+    # drop the "ROI partner type" column
+    df.drop(["ROI partner type"], axis=1)
+    # sort on the values of the column "ROI partner position"
+    df = df.sort_values(by=["ROI partner position"])
+    # set the column order
+    cols = ["residues in contact", "ROI partner position", "ROI partner residue", "second partner position",
+            "second partner residue", "median contacts distance", "number atoms contacts", "atoms contacts",
+            "atoms contacts distances", "ROI partner types"]
+    df = df[cols]
     return df
 
 
@@ -273,41 +287,34 @@ def extract_residues_contacts(path_contacts, roi):
     first_residue = []
     second_position = []
     second_residue = []
-    if roi:
-        # reduce to the donors region of interest limits
-        df_donors = df_contacts_all[df_contacts_all["donor position"].between(roi[0], roi[1])]
-        df_acceptors = df_contacts_all[df_contacts_all["acceptor position"].between(roi[0], roi[1])]
-        logging.debug(f"{len(df_contacts_all)} atoms contacts in the region of interest.")
-        roi_text = f" for donors and acceptors in the region of interest {roi[0]}-{roi[1]}"
-        df_contacts_all = pd.concat([df_donors, df_acceptors]).drop_duplicates()
-        for _, row in df_contacts_all.iterrows():
-            if roi[0] <= row["donor position"] <= roi[1]:
-                first_type.append("donor")
-                first_position.append(row["donor position"])
-                first_residue.append(row["donor residue"])
-                second_position.append(row["acceptor position"])
-                second_residue.append(row["acceptor residue"])
-            else:
-                first_type.append("acceptor")
-                first_position.append(row["acceptor position"])
-                first_residue.append(row["acceptor residue"])
-                second_position.append(row["donor position"])
-                second_residue.append(row["donor residue"])
-    else:
-        for _, row in df_contacts_all.iterrows():
+    # reduce to the donors region of interest limits
+    df_donors = df_contacts_all[df_contacts_all["donor position"].between(roi[0], roi[1])]
+    df_acceptors = df_contacts_all[df_contacts_all["acceptor position"].between(roi[0], roi[1])]
+    logging.debug(f"{len(df_contacts_all)} atoms contacts in the region of interest.")
+    roi_text = f" for donors and acceptors in the region of interest {roi[0]}-{roi[1]}"
+    df_contacts_all = pd.concat([df_donors, df_acceptors]).drop_duplicates()
+    for _, row in df_contacts_all.iterrows():
+        if roi[0] <= row["donor position"] <= roi[1]:
             first_type.append("donor")
             first_position.append(row["donor position"])
             first_residue.append(row["donor residue"])
             second_position.append(row["acceptor position"])
             second_residue.append(row["acceptor residue"])
-    # lose the notions of donor and acceptor to use first and second partner
+        else:
+            first_type.append("acceptor")
+            first_position.append(row["acceptor position"])
+            first_residue.append(row["acceptor residue"])
+            second_position.append(row["donor position"])
+            second_residue.append(row["donor residue"])
+
+    # lose the notions of donor and acceptor to use ROI and second partner
     df_tmp = pd.DataFrame({"contact": df_contacts_all["contact"],
-                           "first partner position": first_position,
-                           "first partner residue": first_residue,
+                           "ROI partner position": first_position,
+                           "ROI partner residue": first_residue,
                            "second partner position": second_position,
                            "second partner residue": second_residue,
                            "median distance": df_contacts_all["median distance"],
-                           "first partner type": first_type})
+                           "ROI partner type": first_type})
     # reduce to residue contacts
     df_residues_contacts = get_residues_in_contact(df_tmp)
     logging.info(f"{len(df_residues_contacts)} extracted residues contacts with {len(df_contacts_all)} atoms "
@@ -345,7 +352,7 @@ def heatmap_distances_nb_contacts(df):
             # get the distance
             if second_position not in distances:
                 distances[second_position] = []
-            dist = df.loc[(df["first partner position"] == first_position) & (
+            dist = df.loc[(df["ROI partner position"] == first_position) & (
                         df["second partner position"] == second_position), "median contacts distance"]
             if not dist.empty:
                 distances[second_position].append(dist.values[0])
@@ -354,7 +361,7 @@ def heatmap_distances_nb_contacts(df):
             # get the number of contacts
             if second_position not in nb_contacts:
                 nb_contacts[second_position] = []
-            contacts = df.loc[(df["first partner position"] == first_position) & (
+            contacts = df.loc[(df["ROI partner position"] == first_position) & (
                         df["second partner position"] == second_position), "number atoms contacts"]
             if not contacts.empty:
                 nb_contacts[second_position].append(contacts.values[0])
@@ -473,7 +480,7 @@ def outliers_contacts(df, res_dist_thr):
     """
     idx_to_remove_for_residue_distance = []
     for idx, row in df.iterrows():
-        if abs(row["first partner position"] - row["second partner position"]) < res_dist_thr:
+        if abs(row["ROI partner position"] - row["second partner position"]) < res_dist_thr:
             idx_to_remove_for_residue_distance.append(idx)
     # remove rows with too close distance between the residues
     df.drop(idx_to_remove_for_residue_distance, inplace=True, axis=0)
@@ -502,12 +509,12 @@ def update_domains(df, domains, out_dir, params):
     acceptors_regions = [None] * len(df)
     for idx, row_contacts in df.iterrows():
         for _, row_domains in domains.iterrows():
-            if row_domains["start"] <= row_contacts["first partner position"] <= row_domains["stop"]:
+            if row_domains["start"] <= row_contacts["ROI partner position"] <= row_domains["stop"]:
                 donors_regions[idx] = row_domains["domain"]
             if row_domains["start"] <= row_contacts["second partner position"] <= row_domains["stop"]:
                 acceptors_regions[idx] = row_domains["domain"]
-    df.insert(2, "first partner domain", pd.DataFrame(donors_regions))
-    df.insert(5, "second partner domain", pd.DataFrame(acceptors_regions))
+    df.insert(3, "ROI partner domain", pd.DataFrame(donors_regions))
+    df.insert(6, "second partner domain", pd.DataFrame(acceptors_regions))
     out_path = os.path.join(out_dir, f"outliers_{params['sample'].replace(' ', '_')}.csv")
     df.to_csv(out_path, index=False)
     logging.info(f"Pairs residues contacts updated with domains saved: {out_path}")
@@ -550,10 +557,10 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
     sns.barplot(data=source, ax=ax, x="domain", y="number of contacts", color="blue")
     ax.set_xticklabels(source["domain"], rotation=45, horizontalalignment="right")
     ax.set_xlabel(None)
-    ax.set_ylabel(f"{'Region Of Interest ' + roi if roi else 'Whole protein'} residues contacts", fontweight="bold")
+    ax.set_ylabel(f"Region Of Interest {roi} residues contacts", fontweight="bold")
     ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(1))
-    ax.text(x=0.5, y=1.1, s=f"{params['sample']}: outliers contacts by domains\nbetween "
-                            f"the {'Region Of Interest ' + roi if roi else 'whole protein'} and the whole protein",
+    ax.text(x=0.5, y=1.1, s=f"{params['sample']}: outliers contacts by domains\nbetween the 'Region Of Interest {roi} "
+                            f"and the whole protein",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
     md_duration = f", MD: {params['parameters']['time']}" if "time" in params['parameters'] else ""
     ax.text(x=0.5, y=1.0,
