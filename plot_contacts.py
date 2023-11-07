@@ -7,7 +7,7 @@ Created on 12 Sep. 2022
 __author__ = "Nicolas JEANNE"
 __copyright__ = "GNU General Public License"
 __email__ = "jeanne.n@chu-toulouse.fr"
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 import argparse
 import logging
@@ -392,6 +392,8 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     logging.info("Computing the contacts heatmap..")
     # create the distances and number of contacts dataframes to produce the heatmap
     source_distances, source_nb_contacts = heatmap_distances_nb_contacts(contacts)
+    # get a mask for the Null values, it will be useful to color those heatmap cells in grey
+    mask = source_distances.isnull()
 
     # increase the size of the heatmap if too many entries
     factor = int(len(source_distances) / 40) if len(source_distances) / 40 >= 1 else 1
@@ -399,7 +401,9 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     matplotlib.rcParams["figure.figsize"] = 15 * factor, 12 * factor
     # create the heatmap
     heatmap = sns.heatmap(source_distances, annot=source_nb_contacts, cbar_kws={"label": "Distance (\u212B)"},
-                          linewidths=0.5, xticklabels=True, yticklabels=True)
+                          linewidths=0.5, xticklabels=True, yticklabels=True, mask=mask)
+    # set the color of Null cells
+    heatmap.set_facecolor("lightgrey")
     heatmap.figure.axes[-1].yaxis.label.set_size(15)
     plot = heatmap.get_figure()
     title = f"Contact residues median distance: {params['sample']}"
