@@ -90,7 +90,7 @@ def get_domains(domains_path, use_embedded):
     """
     logging.info(f"domains embedded in other domains will{' ' if use_embedded else ' not '}be used in the contacts "
                  f"by domain plot.")
-    raw = pd.read_csv(domains_path, sep=",", header=0, names=["domain", "start", "stop", "color"])
+    raw = pd.read_csv(domains_path, sep=",", header=0, names=["domain", "start", "stop", "color"], index_col=False)
 
     # check for embedded entries
     embedded_raw_idx = []
@@ -403,7 +403,7 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     heatmap = sns.heatmap(source_distances, annot=source_nb_contacts, cbar_kws={"label": "Distance (\u212B)"},
                           linewidths=0.5, xticklabels=True, yticklabels=True, mask=mask)
     # set the color of Null cells
-    heatmap.set_facecolor("lightgrey")
+    heatmap.set_facecolor("lavender")
     heatmap.figure.axes[-1].yaxis.label.set_size(15)
     plot = heatmap.get_figure()
     title = f"Contact residues median distance: {params['sample']}"
