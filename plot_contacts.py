@@ -146,6 +146,12 @@ def get_domains(domains_path, use_embedded):
             previous["color"] = row["color"]
             expected_start = row["stop"] + 1
 
+    # add a last row for the case of a contact after the last domain
+    data["domain"].append(f"after {row['domain']}")
+    data["start"].append(row["stop"] + 1)
+    data["stop"].append(row["stop"] + 10000)
+    data["color"].append(None)
+
     df = pd.DataFrame(data)
     return df
 
@@ -234,12 +240,12 @@ def get_residues_in_contact(df):
                 if contacts_str is None:
                     contacts_str = f"{tmp_df_row['contact']}"
                 else:
-                    contacts_str = f"{contacts_str};{tmp_df_row['contact']}"
+                    contacts_str = f"{contacts_str} | {tmp_df_row['contact']}"
                 tmp_df_distance_contacts.append(str(tmp_df_row["median distance"]))
                 tmp_df_partner_types.append(tmp_df_row["ROI partner type"])
             combinations_atoms_contacts.append(contacts_str)
-            combinations_atoms_contacts_distances.append(";".join(tmp_df_distance_contacts))
-            first_partner_types.append(";".join(tmp_df_partner_types))
+            combinations_atoms_contacts_distances.append(" | ".join(tmp_df_distance_contacts))
+            first_partner_types.append(" | ".join(tmp_df_partner_types))
         else:
             idx_to_remove.append(idx)
     df = df.drop(idx_to_remove)
