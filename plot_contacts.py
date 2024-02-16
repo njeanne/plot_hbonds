@@ -561,7 +561,14 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
     sns.set_context("poster", rc={"grid.linewidth": 2})
     fig, ax = plt.subplots(figsize=(15, 15))
     sns.barplot(data=source, ax=ax, x="domain", y="number of contacts", color="blue")
-    ax.set_xticklabels(source["domain"], rotation=45, horizontalalignment="right")
+
+    # modify the ticks labels for the X axis by adding new lines every 3 words
+    modified_x_labels = [re.sub(r'(\w+ \w+ \w+)( )',
+                                r'\1\n', x_label.get_text()) for x_label in ax.get_xticklabels()]
+    # set the number of ticks for the X axis to avoid a matplotlib warning
+    ax.set_xticks([num_tick for num_tick in range(len(modified_x_labels))])
+    ax.set_xticklabels(modified_x_labels, rotation=45, horizontalalignment="right")
+
     ax.set_xlabel(None)
     ax.set_ylabel(f"Region Of Interest {roi} residues contacts", fontweight="bold")
     ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(1))
