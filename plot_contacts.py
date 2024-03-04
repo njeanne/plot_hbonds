@@ -7,7 +7,7 @@ Created on 12 Sep. 2022
 __author__ = "Nicolas JEANNE"
 __copyright__ = "GNU General Public License"
 __email__ = "jeanne.n@chu-toulouse.fr"
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 
 import argparse
 import logging
@@ -380,7 +380,7 @@ def heatmap_distances_nb_contacts(df):
     return source_distances, source_nb_contacts
 
 
-def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
+def heatmap_contacts(contacts, params, out_dir, output_fmt, roi_id):
     """
     Create the heatmap of contacts between residues.
 
@@ -392,8 +392,8 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     :type out_dir: str
     :param output_fmt: the output format for the heatmap.
     :type output_fmt: str
-    :param lim_roi: the region of interest limits for the heatmap.
-    :type lim_roi: list
+    :param roi_id: the region of interest.
+    :type roi_id: str
     """
     logging.info("Computing the contacts heatmap..")
     # create the distances and number of contacts dataframes to produce the heatmap
@@ -416,13 +416,13 @@ def heatmap_contacts(contacts, params, out_dir, output_fmt, lim_roi):
     plt.suptitle(title, fontsize="large", fontweight="bold")
     md_duration = f"MD length: {params['MD duration']}. " if "MD duration" in params else ""
     subtitle = f"{md_duration}Count of residues atoms in contact are displayed in the squares.\nRegion Of Interest: " \
-                f"{lim_roi[0]} to {lim_roi[1]} ({params['residues']} residues in the protein)"
+                f"{roi_id} versus the {params['residues']} residues of the protein."
     if params["frames"]:
         subtitle = f"{subtitle}\n{params['parameters']['proportion contacts']}% of contacts in {params['frames']} " \
                    f"frames."
     plt.title(subtitle)
     plt.xlabel("Whole protein residues", fontweight="bold")
-    plt.ylabel("Region Of Interest residues", fontweight="bold")
+    plt.ylabel(f"{roi_id} residues", fontweight="bold")
     out_path = os.path.join(out_dir, f"heatmap_distances_{params['sample'].replace(' ', '_')}.{output_fmt}")
     plot.savefig(out_path)
     # clear the plot for the next use of the function
@@ -496,6 +496,27 @@ def outliers_contacts(df, res_dist_thr):
     return df
 
 
+def extract_roi_id(domains, roi_coord):
+    """
+    Extract the Region Of Interest (ROI) identity from the domain file using the start and stop coordinates. If no
+    match is performed, the ROI is returned as the start and stop coordinates.
+
+    :param domains: the domain information.
+    :type domains: pandas.dataframe
+    :param roi_coord: the region of interest's start and stop coordinates.
+    :type roi_coord: list
+    :return: the ROI identity.
+    :rtype: str
+    """
+    try:
+        roi_id = domains.loc[(domains["start"] == roi_coord[0]) & (domains["stop"] == roi_coord[1])]["domain"].values[0]
+    except IndexError:
+        roi_id = f"{roi_coord[0]}-{roi_coord[1]}"
+        logging.warning(f"no domains match with the coordinates {roi_id} in the domains CSV file provided, this "
+                        f"coordinates will be used to named the Region Of Interest instead of a domain name.")
+    return roi_id
+
+
 def update_domains(df, domains, out_dir, params):
     """
     Get the domains for pairs acceptor and donor.
@@ -527,7 +548,7 @@ def update_domains(df, domains, out_dir, params):
     return df
 
 
-def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist):
+def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_dist):
     """
     Create the plot of contacts by regions.
 
@@ -539,8 +560,8 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
     :type out_dir: str
     :param params: the parameters used in the previous trajectory contacts analysis.
     :type params: dict
-    :param roi: the region of interest.
-    :type roi: str
+    :param roi_id: the region of interest name.
+    :type roi_id: str
     :param fmt: the format for the plot.
     :type fmt: str
     :param res_dist: the maximal residues distance in the amino acids chain.
@@ -570,10 +591,10 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi, fmt, res_dist)
     ax.set_xticklabels(modified_x_labels, rotation=45, horizontalalignment="right")
 
     ax.set_xlabel(None)
-    ax.set_ylabel(f"Region Of Interest {roi} residues contacts", fontweight="bold")
+    ax.set_ylabel(f"Region Of Interest {roi_id} residues contacts", fontweight="bold")
     ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(1))
-    ax.text(x=0.5, y=1.1, s=f"{params['sample']}: outliers contacts by domains\nbetween the Region Of Interest {roi} "
-                            f"and the whole protein",
+    ax.text(x=0.5, y=1.1, s=f"{params['sample']}: outliers contacts by domains\nbetween the Region Of Interest "
+                            f"{roi_id} and the whole protein",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
     md_duration = f", MD: {params['parameters']['time']}" if "time" in params['parameters'] else ""
     ax.text(x=0.5, y=1.0,
@@ -618,7 +639,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--parameters", required=True, type=str,
                         help="the path to the trajectory contacts analysis parameters (the YAML file in the results "
                              "directory of the trajectory_contacts.py script.")
-    parser.add_argument("-i", "--roi", required=True, type=str,
+    parser.add_argument("-r", "--roi", required=True, type=str,
                         help="the donors Region Of Interest (ROI) amino acids coordinates, the format should be two "
                              "digits separated by an hyphen, i.e: '100-200'.")
     parser.add_argument("-f", "--format", required=False, default="svg",
@@ -630,7 +651,7 @@ if __name__ == "__main__":
                              "'rgba': 'Raw RGBA bitmap', 'svg': 'Scalable Vector Graphics', "
                              "'svgz': 'Scalable Vector Graphics', 'tif': 'Tagged Image File Format', "
                              "'tiff': 'Tagged Image File Format'. Default is 'svg'.")
-    parser.add_argument("-r", "--residues-distance", required=False, type=int, default=4,
+    parser.add_argument("-x", "--residues-distance", required=False, type=int, default=4,
                         help="when 2 atoms of different residues are in contact, the minimal distance in number of "
                              "residues that should separate them for a long range interaction. Default is 4 residues, "
                              "the number of residues in an alpha helix.")
@@ -679,8 +700,17 @@ if __name__ == "__main__":
                       exc_info=True)
         sys.exit(1)
 
+    if args.domains:
+        # load and format the domains file
+        domains_data = get_domains(args.domains, args.embedded_domains)
+        # match the ROI coordinates with a domain
+        roi = extract_roi_id(domains_data, roi_limits)
+    else:
+        roi = f"{roi_limits[0]}-{roi_limits[1]}"
+        domains_data = None
+
     # get the heatmaps of validated contacts by residues
-    heatmap_contacts(residues_contacts, parameters_contacts_analysis, args.out, args.format, roi_limits)
+    heatmap_contacts(residues_contacts, parameters_contacts_analysis, args.out, args.format, roi)
 
     outliers = outliers_contacts(residues_contacts, args.residues_distance)
     logging.info(f"{len(outliers)} unique residues pairs contacts (<= "
@@ -690,11 +720,8 @@ if __name__ == "__main__":
                  f"contacts).")
 
     if args.domains:
-        # load and format the domains file
-        domains_data = get_domains(args.domains, args.embedded_domains)
         # get the outliers contacts
         outliers = update_domains(outliers, domains_data, args.out, parameters_contacts_analysis)
-
         # by acceptor domain
-        acceptors_domains_involved(outliers, domains_data, args.out, parameters_contacts_analysis, args.roi,
-                                   args.format, args.residues_distance)
+        acceptors_domains_involved(outliers, domains_data, args.out, parameters_contacts_analysis, roi, args.format,
+                                   args.residues_distance)
