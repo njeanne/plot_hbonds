@@ -7,7 +7,7 @@ Created on 12 Sep. 2022
 __author__ = "Nicolas JEANNE"
 __copyright__ = "GNU General Public License"
 __email__ = "jeanne.n@chu-toulouse.fr"
-__version__ = "2.3.0"
+__version__ = "2.3.1"
 
 import argparse
 import logging
@@ -592,7 +592,6 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_di
 
     ax.set_xlabel(None)
     ax.set_ylabel(f"Region Of Interest {roi_id} residues contacts", fontweight="bold")
-    ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(1))
     ax.text(x=0.5, y=1.1, s=f"{params['sample']}: outliers contacts by domains\nbetween the Region Of Interest "
                             f"{roi_id} and the whole protein",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
