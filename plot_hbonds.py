@@ -198,13 +198,15 @@ def extract_roi(roi_to_extract):
     return roi_extracted
 
 
-def get_residues_in_contact(df):
+def get_residues_forming_an_hydrogen_bond(df):
     """
     Reduce the hydrogen bonds to a residue hydrogen bonds if two residues have multiple atoms in hydrogen bonds. The
     residue in the ROI is used as reference, the median distance between the ROI (Region Of Interest) residue atoms and
-    the atoms of its partner will be added. All their atoms hydrogen bonds identifiers will be regrouped in a single
-    column with semicolon separators. Same thing for their median distances during the molecular dynamics simulation
-    and the type of the residue's atom in the ROI (donor or acceptor).
+    the atoms of its partner will be added.
+    All their atoms involved in hydrogen bonds identifiers will be regrouped in a single column with semicolon
+    separators.
+    Same thing for their median distances during the molecular dynamics simulation and the type of the residue's atom
+    in the ROI (donor or acceptor).
 
     :param df: the hydrogen bonds from the trajectory analysis.
     :type df: pandas.Dataframe
@@ -238,9 +240,9 @@ def get_residues_in_contact(df):
             tmp_df_partner_types = []
             for _, tmp_df_row in tmp_df.iterrows():
                 if hydrogen_bonds_str is None:
-                    hydrogen_bonds_str = f"{tmp_df_row['contact']}"
+                    hydrogen_bonds_str = f"{tmp_df_row['hydrogen bond']}"
                 else:
-                    hydrogen_bonds_str = f"{hydrogen_bonds_str} | {tmp_df_row['contact']}"
+                    hydrogen_bonds_str = f"{hydrogen_bonds_str} | {tmp_df_row['hydrogen bond']}"
                 tmp_df_distance_hydrogen_bonds.append(str(tmp_df_row["median distance"]))
                 tmp_df_partner_types.append(tmp_df_row["ROI partner type"])
             combinations_atoms_hydrogen_bonds.append(hydrogen_bonds_str)
@@ -249,7 +251,7 @@ def get_residues_in_contact(df):
         else:
             idx_to_remove.append(idx)
     df = df.drop(idx_to_remove)
-    df["contact"] = combinations
+    df["hydrogen bond"] = combinations
     df["median distance"] = median_distances
     df["number atoms hydrogen bonds"] = combinations_nb_hydrogen_bonds
     df["atoms hydrogen bonds"] = combinations_atoms_hydrogen_bonds
@@ -257,13 +259,13 @@ def get_residues_in_contact(df):
     df["ROI partner types"] = first_partner_types
     # rename the columns
     df.rename(columns={"median distance": "median hydrogen bonds distance"}, inplace=True)
-    df.rename(columns={"contact": "residues in contact"}, inplace=True)
+    df.rename(columns={"hydrogen bond": "residues hydrogen bond"}, inplace=True)
     # drop the "ROI partner type" column
     df.drop(["ROI partner type"], axis=1)
     # sort on the values of the column "ROI partner position"
     df = df.sort_values(by=["ROI partner position"])
     # set the column order
-    cols = ["residues in contact", "ROI partner position", "ROI partner residue", "second partner position",
+    cols = ["residues hydrogen bond", "ROI partner position", "ROI partner residue", "second partner position",
             "second partner residue", "median hydrogen bonds distance", "number atoms hydrogen bonds",
             "atoms hydrogen bonds", "atoms hydrogen bonds distances", "ROI partner types"]
     df = df[cols]
@@ -284,8 +286,8 @@ def extract_residues_hydrogen_bonds(path_hydrogen_bonds, roi):
     """
     # load the hydrogen bonds' file
     df_hydrogen_bonds_all = pd.read_csv(path_hydrogen_bonds, sep=",")
-    logging.info(f"{len(df_hydrogen_bonds_all)} atoms hydrogen bonds in the input data (residues pairs may have "
-                 f"multiple atoms hydrogen bonds).")
+    logging.info(f"{len(df_hydrogen_bonds_all)} atoms involved in hydrogen bonds in the input data (residues pairs may "
+                 f"have multiple atoms hydrogen bonds).")
     # select the rows of acceptors and donors within the region of interest if any
     roi_text = ""
     first_type = []
@@ -296,7 +298,7 @@ def extract_residues_hydrogen_bonds(path_hydrogen_bonds, roi):
     # reduce to the donors region of interest limits
     df_donors = df_hydrogen_bonds_all[df_hydrogen_bonds_all["donor position"].between(roi[0], roi[1])]
     df_acceptors = df_hydrogen_bonds_all[df_hydrogen_bonds_all["acceptor position"].between(roi[0], roi[1])]
-    logging.debug(f"{len(df_hydrogen_bonds_all)} atoms hydrogen bonds in the region of interest.")
+    logging.debug(f"{len(df_hydrogen_bonds_all)} atoms involved in hydrogen bonds in the region of interest.")
     roi_text = f" for donors and acceptors in the region of interest {roi[0]}-{roi[1]}"
     df_hydrogen_bonds_all = pd.concat([df_donors, df_acceptors]).drop_duplicates()
     for _, row in df_hydrogen_bonds_all.iterrows():
@@ -314,7 +316,7 @@ def extract_residues_hydrogen_bonds(path_hydrogen_bonds, roi):
             second_residue.append(row["donor residue"])
 
     # lose the notions of donor and acceptor to use ROI and second partner
-    df_tmp = pd.DataFrame({"contact": df_hydrogen_bonds_all["contact"],
+    df_tmp = pd.DataFrame({"hydrogen bond": df_hydrogen_bonds_all["contact"],
                            "ROI partner position": first_position,
                            "ROI partner residue": first_residue,
                            "second partner position": second_position,
@@ -322,9 +324,9 @@ def extract_residues_hydrogen_bonds(path_hydrogen_bonds, roi):
                            "median distance": df_hydrogen_bonds_all["median distance"],
                            "ROI partner type": first_type})
     # reduce to residue hydrogen bonds
-    df_residues_hydrogen_bonds = get_residues_in_contact(df_tmp)
-    logging.info(f"{len(df_residues_hydrogen_bonds)} extracted residues hydrogen bonds with "
-                 f"{len(df_hydrogen_bonds_all)} atoms hydrogen bonds{roi_text}.")
+    df_residues_hydrogen_bonds = get_residues_forming_an_hydrogen_bond(df_tmp)
+    logging.info(f"{len(df_residues_hydrogen_bonds)} extracted residues forming hydrogen bonds with "
+                 f"{len(df_hydrogen_bonds_all)} atoms (donors and acceptors) involved in hydrogen bonds{roi_text}.")
     return df_residues_hydrogen_bonds
 
 
@@ -412,14 +414,13 @@ def heatmap_hydrogen_bonds(hydrogen_bonds, params, out_dir, output_fmt, roi_id):
     heatmap.set_facecolor("lavender")
     heatmap.figure.axes[-1].yaxis.label.set_size(15)
     plot = heatmap.get_figure()
-    title = f"Contact residues median distance: {params['sample']}"
+    title = f"Hydrogen bonds residues median distance: {params['sample']} {roi_id} vs. whole protein"
     plt.suptitle(title, fontsize="large", fontweight="bold")
     md_duration = f"MD length: {params['MD duration']}. " if "MD duration" in params else ""
-    subtitle = f"{md_duration}Count of residues atoms in contact are displayed in the squares.\nRegion Of Interest: " \
-                f"{roi_id} versus the {params['residues']} residues of the protein."
+    subtitle = f"{md_duration}The number of residue atoms forming hydrogen bonds is shown in the squares."
     if params["frames"]:
-        subtitle = (f"{subtitle}\n{params['parameters']['proportion hbonds']}% of hydrogen bonds in {params['frames']} "
-                    f"frames.")
+        subtitle = (f"{subtitle}\nHydrogen bond validated if present in {params['parameters']['proportion hbonds']}% "
+                    f"of the {params['frames']} frames.")
     plt.title(subtitle)
     plt.xlabel("Whole protein residues", fontweight="bold")
     plt.ylabel(f"{roi_id} residues", fontweight="bold")
@@ -432,13 +433,13 @@ def heatmap_hydrogen_bonds(hydrogen_bonds, params, out_dir, output_fmt, roi_id):
 
 def unique_residues_pairs(df_not_unique, col):
     """
-    Get the unique residues pairs hydrogen bonds.
+    Get the unique residues pairs forming hydrogen bonds.
 
     :param df_not_unique: the dataframe of hydrogen bonds.
     :type df_not_unique: pd.Dataframe
-    :param col: the atoms distances column name.
+    :param col: the atom distances column name.
     :type col: str
-    :return: the dataframe of unique residues pairs hydrogen bonds.
+    :return: the dataframe of unique residues pairs forming hydrogen bonds.
     :rtype: pd.Dataframe
     """
     donor_positions = []
@@ -460,7 +461,7 @@ def unique_residues_pairs(df_not_unique, col):
             max_atoms_dist.append(max(df_acceptors[col]))
             pair_hydrogen_bonds_ids = []
             for _, row in df_acceptors.iterrows():
-                pair_hydrogen_bonds_ids.append(row["contact"])
+                pair_hydrogen_bonds_ids.append(row["hydrogen bond"])
             hydrogen_bonds_ids.append(" | ".join(pair_hydrogen_bonds_ids))
 
     df_uniques = pd.DataFrame.from_dict({"donor positions": donor_positions,
@@ -482,7 +483,7 @@ def outliers_hydrogen_bonds(df, res_dist_thr):
     :type df: pd.Dataframe
     :param res_dist_thr: the residues distance threshold.
     :type res_dist_thr: int
-    :return: the dataframe of unique residues pairs hydrogen bonds.
+    :return: the dataframe of unique residues pairs forming hydrogen bonds.
     :rtype: pd.Dataframe
     """
     idx_to_remove_for_residue_distance = []
@@ -493,7 +494,7 @@ def outliers_hydrogen_bonds(df, res_dist_thr):
     df.drop(idx_to_remove_for_residue_distance, inplace=True, axis=0)
     # reset the index of the dataframe from 0
     df.reset_index(inplace=True, drop=True)
-    logging.debug(f"{len(df)} atoms hydrogen bonds remaining with a minimal residues distance threshold of "
+    logging.debug(f"{len(df)} atoms involved in hydrogen bonds remaining with a minimal residues distance threshold of "
                   f"{res_dist_thr}.")
     return df
 
@@ -523,7 +524,7 @@ def update_domains(df, domains, out_dir, params):
     """
     Get the domains for pairs acceptor and donor.
 
-    :param df: the dataframe of unique residues pairs hydrogen bonds.
+    :param df: the dataframe of unique residues pairs forming hydrogen bonds.
     :type df: pd.Dataframe
     :param domains: the domain's coordinates.
     :type domains: pd.Dataframe
@@ -714,7 +715,7 @@ if __name__ == "__main__":
     heatmap_hydrogen_bonds(residues_hydrogen_bonds, parameters_hydrogen_bonds_analysis, args.out, args.format, roi)
 
     outliers = outliers_hydrogen_bonds(residues_hydrogen_bonds, args.residues_distance)
-    logging.info(f"{len(outliers)} unique residues pairs hydrogen bonds (<= "
+    logging.info(f"{len(outliers)} unique residues pairs forming hydrogen bonds (<= "
                  f"{parameters_hydrogen_bonds_analysis['parameters']['maximal atoms distance']} \u212B) with a "
                  f"distance of at least {args.residues_distance} residues"
                  f"{' in the region of interest '+args.roi if args.roi else ''} (residues pair may have multiple atoms "
