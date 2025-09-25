@@ -253,7 +253,7 @@ def get_residues_forming_an_hydrogen_bond(df):
     df = df.drop(idx_to_remove)
     df["hydrogen bond"] = combinations
     df["median distance"] = median_distances
-    df["number atoms hydrogen bonds"] = combinations_nb_hydrogen_bonds
+    df["number atoms contacts"] = combinations_nb_hydrogen_bonds
     df["atoms hydrogen bonds"] = combinations_atoms_hydrogen_bonds
     df["atoms hydrogen bonds distances"] = combinations_atoms_hydrogen_bonds_distances
     df["ROI partner types"] = first_partner_types
@@ -266,7 +266,7 @@ def get_residues_forming_an_hydrogen_bond(df):
     df = df.sort_values(by=["ROI partner position"])
     # set the column order
     cols = ["residues hydrogen bond", "ROI partner position", "ROI partner residue", "second partner position",
-            "second partner residue", "median hydrogen bonds distance", "number atoms hydrogen bonds",
+            "second partner residue", "median hydrogen bonds distance", "number atoms contacts",
             "atoms hydrogen bonds", "atoms hydrogen bonds distances", "ROI partner types"]
     df = df[cols]
     return df
@@ -370,7 +370,7 @@ def heatmap_distances_nb_hydrogen_bonds(df):
             if second_position not in nb_hydrogen_bonds:
                 nb_hydrogen_bonds[second_position] = []
             hydrogen_bonds = df.loc[(df["ROI partner position"] == first_position) & (
-                        df["second partner position"] == second_position), "number atoms hydrogen bonds"]
+                        df["second partner position"] == second_position), "number atoms contacts"]
             if not hydrogen_bonds.empty:
                 nb_hydrogen_bonds[second_position].append(hydrogen_bonds.values[0])
             else:
@@ -577,7 +577,7 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_di
             if not row_domains["domain"] in data:
                 data[row_domains["domain"]] = 0
             for _, row_tmp in tmp.iterrows():
-                data[row_domains["domain"]] += row_tmp["number atoms hydrogen bonds"]
+                data[row_domains["domain"]] += row_tmp["number atoms contacts"]
     source = pd.DataFrame.from_dict({"domain": data.keys(), "number of hydrogen bonds": data.values()})
 
     # set the seaborn plots style and size
