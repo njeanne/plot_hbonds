@@ -7,8 +7,8 @@ residues hydrogen bonds.
 A Region Of Interest (ROI) is defined with a range of amino acids selected in the protein,
 on the heatmap the hydrogen bonds on the ordinate axis will be the ones belonging to this ROI.
 
-If a domains CSV file is used with the option `--domains`, a plot and a CSV file of the hydrogen bonds by domains will be 
-produced. An example of the domains CSV file is provided in `data/traj_test_domains.csv`
+If a domains CSV file is used with the option `--domains`, a plot and a CSV file of the hydrogen bonds by domains will 
+be produced. An example of the domains CSV file is provided in `data/traj_test_domains.csv`
 For this CSV, if some domains are embedded in other domains, they can be displayed in the outputs with the option 
 `--embedded-domains`.
 
@@ -66,9 +66,9 @@ The script outputs are:
 ![hydrogen bonds heatmap](doc/_static/heatmap.svg)
 
 And if the `--domains` option is used: 
-- a CSV file of the hydrogen bonds with the minimal residues distance for the whole protein or the region of interest if used 
-on the whole protein.
-- a plot of the hydrogen bonds with the minimal residues distance for the whole protein or the region of interest if used on 
-the whole protein:
+- a CSV file of the hydrogen bonds with the minimal residue distance for the whole protein or the region of interest 
+if used on the whole protein.
+- a plot of the hydrogen bonds with the minimal residue distance for the whole protein or the region of interest if 
+used on the whole protein:
 
 ![hydrogen bonds heatmap](doc/_static/outliers.svg)

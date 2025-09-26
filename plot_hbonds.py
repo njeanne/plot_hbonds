@@ -254,20 +254,20 @@ def get_residues_forming_an_hydrogen_bond(df):
     df["hydrogen bond"] = combinations
     df["median distance"] = median_distances
     df["number atoms contacts"] = combinations_nb_hydrogen_bonds
-    df["atoms hydrogen bonds"] = combinations_atoms_hydrogen_bonds
-    df["atoms hydrogen bonds distances"] = combinations_atoms_hydrogen_bonds_distances
+    df["atoms contacts"] = combinations_atoms_hydrogen_bonds
+    df["atoms contacts distances"] = combinations_atoms_hydrogen_bonds_distances
     df["ROI partner types"] = first_partner_types
     # rename the columns
-    df.rename(columns={"median distance": "median hydrogen bonds distance"}, inplace=True)
-    df.rename(columns={"hydrogen bond": "residues hydrogen bond"}, inplace=True)
+    df.rename(columns={"median distance": "median contacts distance"}, inplace=True)
+    df.rename(columns={"hydrogen bond": "residues contact"}, inplace=True)
     # drop the "ROI partner type" column
     df.drop(["ROI partner type"], axis=1)
     # sort on the values of the column "ROI partner position"
     df = df.sort_values(by=["ROI partner position"])
     # set the column order
-    cols = ["residues hydrogen bond", "ROI partner position", "ROI partner residue", "second partner position",
-            "second partner residue", "median hydrogen bonds distance", "number atoms contacts",
-            "atoms hydrogen bonds", "atoms hydrogen bonds distances", "ROI partner types"]
+    cols = ["residues contact", "ROI partner position", "ROI partner residue", "second partner position",
+            "second partner residue", "median contacts distance", "number atoms contacts",
+            "atoms contacts", "atoms contacts distances", "ROI partner types"]
     df = df[cols]
     return df
 
@@ -361,7 +361,7 @@ def heatmap_distances_nb_hydrogen_bonds(df):
             if second_position not in distances:
                 distances[second_position] = []
             dist = df.loc[(df["ROI partner position"] == first_position) & (
-                        df["second partner position"] == second_position), "median hydrogen bonds distance"]
+                        df["second partner position"] == second_position), "median contacts distance"]
             if not dist.empty:
                 distances[second_position].append(dist.values[0])
             else:
@@ -382,12 +382,12 @@ def heatmap_distances_nb_hydrogen_bonds(df):
     return source_distances, source_nb_hydrogen_bonds
 
 
-def heatmap_hydrogen_bonds(hydrogen_bonds, params, out_dir, output_fmt, roi_id):
+def heatmap_hydrogen_bonds(hbonds, params, out_dir, output_fmt, roi_id):
     """
     Create the heatmap of hydrogen bonds between residues.
 
-    :param hydrogen_bonds: the hydrogen bonds by residues.
-    :type hydrogen_bonds: dict
+    :param hbonds: the hydrogen bonds by residues.
+    :type hbonds: dict
     :param params: the parameters used in the previous trajectory hydrogen bonds analysis.
     :type params: dict
     :param out_dir: the output directory.
@@ -399,7 +399,7 @@ def heatmap_hydrogen_bonds(hydrogen_bonds, params, out_dir, output_fmt, roi_id):
     """
     logging.info("Computing the hydrogen bonds heatmap..")
     # create the distances and number of hydrogen bonds dataframes to produce the heatmap
-    source_distances, source_nb_hydrogen_bonds = heatmap_distances_nb_hydrogen_bonds(hydrogen_bonds)
+    source_distances, source_nb_hydrogen_bonds = heatmap_distances_nb_hydrogen_bonds(hbonds)
     # get a mask for the Null values, it will be useful to color those heatmap cells in grey
     mask = source_distances.isnull()
 
@@ -468,13 +468,13 @@ def unique_residues_pairs(df_not_unique, col):
                                          "donor residues": donor_residues,
                                          "acceptor positions": acceptor_positions,
                                          "acceptor residues": acceptor_residues,
-                                         "atoms hydrogen bonds": nb_hydrogen_bonds,
+                                         "atoms contacts": nb_hydrogen_bonds,
                                          "maximum atoms distance": max_atoms_dist,
                                          "hydrogen bonds ID": hydrogen_bonds_ids})
     return df_uniques
 
 
-def outliers_hydrogen_bonds(df, res_dist_thr):
+def hydrogen_bonds_residues_pairs(df, res_dist_thr):
     """
     Get the residues pairs hydrogen bonds above the residues distance hydrogen bonds, meaning hydrogen bonds of distant
     residues.
@@ -520,7 +520,7 @@ def extract_roi_id(domains, roi_coord):
     return roi_id
 
 
-def update_domains(df, domains, out_dir, params):
+def update_domains(df, domains, out_dir, params, roi_id):
     """
     Get the domains for pairs acceptor and donor.
 
@@ -532,6 +532,8 @@ def update_domains(df, domains, out_dir, params):
     :type out_dir: str
     :param params: the parameters used in the previous trajectory hydrogen bonds analysis.
     :type params: dict
+    :param roi_id: the region of interest name.
+    :type roi_id: str
     :return: the pairs hydrogen bonds dataframe updated with the regions.
     :rtype: pd.Dataframe
     """
@@ -545,7 +547,7 @@ def update_domains(df, domains, out_dir, params):
                 acceptors_regions[idx] = row_domains["domain"]
     df.insert(3, "ROI partner domain", pd.DataFrame(donors_regions))
     df.insert(6, "second partner domain", pd.DataFrame(acceptors_regions))
-    out_path = os.path.join(out_dir, f"outliers_{params['sample'].replace(' ', '_')}.csv")
+    out_path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_{roi_id}.csv")
     df.to_csv(out_path, index=False)
     logging.info(f"Pairs residues hydrogen bonds updated with domains saved: {out_path}")
     return df
@@ -604,7 +606,7 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_di
               f"{params['parameters']['proportion hbonds']}% of hydrogen bonds in {params['frames']} "
               f"frames{md_duration}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
-    path = os.path.join(out_dir, f"outliers_{params['sample'].replace(' ', '_')}.{fmt}")
+    path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_{roi_id}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
     logging.info(f"Contacts by domain plot saved: {path}")
 
@@ -658,10 +660,10 @@ if __name__ == "__main__":
                              "residues that should separate them for a long range interaction. Default is 4 residues, "
                              "the number of residues in an alpha helix.")
     parser.add_argument("-e", "--embedded-domains", required=False, action="store_true",
-                        help="for the outliers plot of hydrogen bonds between a specific domain and the whole protein, "
-                             "use the domains embedded in another domain. In example, if the domain 2 is in domain 1, "
-                             "the plot will represent the domain 1 as: domain-1 domain-2 domain-1. If this option is "
-                             "not used only the domain 1 will be used in the plot.")
+                        help="for the hydrogen bonds plot between a specific domain and the whole protein, use the "
+                             "domains embedded in another domain. In example, if the domain 2 is in domain 1, the plot "
+                             "will represent the domain 1 as: domain-1 domain-2 domain-1. If this option is not used "
+                             "only the domain 1 will be used in the plot.")
     parser.add_argument("-l", "--log", required=False, type=str,
                         help="the path for the log file. If this option is skipped, the log file is created in the "
                              "output directory.")
@@ -698,7 +700,8 @@ if __name__ == "__main__":
         logging.error(f"\"{args.col_distance}\" column name does not exists in the CSV file.", exc_info=True)
         sys.exit(1)
     except TypeError as exc:
-        logging.error(f"\"{args.col_distance}\" column name may refers to a column that is not an atoms distances.",
+        logging.error(f"\"{args.col_distance}\" column name may refers to a column that is not an atoms "
+                      f"distances.",
                       exc_info=True)
         sys.exit(1)
 
@@ -714,16 +717,15 @@ if __name__ == "__main__":
     # get the heatmaps of validated hydrogen bonds by residues
     heatmap_hydrogen_bonds(residues_hydrogen_bonds, parameters_hydrogen_bonds_analysis, args.out, args.format, roi)
 
-    outliers = outliers_hydrogen_bonds(residues_hydrogen_bonds, args.residues_distance)
-    logging.info(f"{len(outliers)} unique residues pairs forming hydrogen bonds (<= "
+    hydrogen_bonds = hydrogen_bonds_residues_pairs(residues_hydrogen_bonds, args.residues_distance)
+    logging.info(f"{len(hydrogen_bonds)} unique residues pairs forming hydrogen bonds (<= "
                  f"{parameters_hydrogen_bonds_analysis['parameters']['maximal atoms distance']} \u212B) with a "
                  f"distance of at least {args.residues_distance} residues"
                  f"{' in the region of interest '+args.roi if args.roi else ''} (residues pair may have multiple atoms "
                  f"hydrogen bonds).")
 
     if args.domains:
-        # get the outliers hydrogen bonds
-        outliers = update_domains(outliers, domains_data, args.out, parameters_hydrogen_bonds_analysis)
+        hydrogen_bonds = update_domains(hydrogen_bonds, domains_data, args.out, parameters_hydrogen_bonds_analysis, roi)
         # by acceptor domain
-        acceptors_domains_involved(outliers, domains_data, args.out, parameters_hydrogen_bonds_analysis, roi, args.format,
-                                   args.residues_distance)
+        acceptors_domains_involved(hydrogen_bonds, domains_data, args.out, parameters_hydrogen_bonds_analysis, roi,
+                                   args.format, args.residues_distance)
