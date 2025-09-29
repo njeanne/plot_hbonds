@@ -36,6 +36,7 @@ def create_log(log_path, level, out_dir):
     :type out_dir: str
     """
     os.makedirs(out_dir, exist_ok=True)
+    log_path=log_path.replace(" ", "-")
     if not log_path:
         log_path = os.path.join(out_dir, f"{os.path.splitext(os.path.basename(__file__))[0]}.log")
     log_level_dict = {"DEBUG": logging.DEBUG,
@@ -547,7 +548,8 @@ def update_domains(df, domains, out_dir, params, roi_id):
                 acceptors_regions[idx] = row_domains["domain"]
     df.insert(3, "ROI partner domain", pd.DataFrame(donors_regions))
     df.insert(6, "second partner domain", pd.DataFrame(acceptors_regions))
-    out_path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_{roi_id}.csv")
+    out_path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_"
+                                     f"{roi_id.replace(' ', '-')}.csv")
     df.to_csv(out_path, index=False)
     logging.info(f"Pairs residues hydrogen bonds updated with domains saved: {out_path}")
     return df
@@ -606,7 +608,8 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_di
               f"{params['parameters']['proportion hbonds']}% of hydrogen bonds in {params['frames']} "
               f"frames{md_duration}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
-    path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_{roi_id}.{fmt}")
+    path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_"
+                                 f"{roi_id.replace(' ', '-')}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
     logging.info(f"Contacts by domain plot saved: {path}")
 
