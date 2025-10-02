@@ -1,19 +1,35 @@
 atoms: 27119
-frames: 5000
+frames: 245000
 frames selection:
-  JQ679013_RPS17_ORF1_0_MD-30M.nc:
+  Sample-X_0_MD-30M.nc:
     begin: 10000
     end: 15000
 molecules: 1
 parameters:
   angle cutoff: 135
   maximal atoms distance: 3.0
-  proportion contacts: 50.0
-  time: 60 ns
-pickle hydrogen bonds: /tmpdir/jeanne/MD/analysis/contacts/insertions/MD-30M/JQ679013_RPS17_ORF1_analysis.pkl
+  proportion hbonds: 50.0
+  time: 1020 ns
+pickle hydrogen bonds: /tmpdir/p24036jn/MD/analysis/hbonds/by_sample/50.0pct/insertions/MD-510M/Sample-X_analysis.pkl
 residues: 1765
-sample: JQ679013_RPS17_ORF1
-size Gb: 3.0307844281196594
-topology file: JQ679013_RPS17_ORF1_0.parm
+sample: Sample-X
+size Gb: 148.5084369778633
+topology file: Sample-X_0.parm
 trajectory files processed:
-- JQ679013_RPS17_ORF1_0_MD-30M.nc
+- Sample-X_0_MD-30M.nc
+- Sample-X_0_MD-60M.nc
+- Sample-X_0_MD-90M.nc
+- Sample-X_0_MD-120M.nc
+- Sample-X_0_MD-150M.nc
+- Sample-X_0_MD-180M.nc
+- Sample-X_0_MD-210M.nc
+- Sample-X_0_MD-240M.nc
+- Sample-X_0_MD-270M.nc
+- Sample-X_0_MD-300M.nc
+- Sample-X_0_MD-330M.nc
+- Sample-X_0_MD-360M.nc
+- Sample-X_0_MD-390M.nc
+- Sample-X_0_MD-420M.nc
+- Sample-X_0_MD-450M.nc
+- Sample-X_0_MD-480M.nc
+- Sample-X_0_MD-510M.nc
