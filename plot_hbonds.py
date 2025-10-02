@@ -36,7 +36,6 @@ def create_log(log_path, level, out_dir):
     :type out_dir: str
     """
     os.makedirs(out_dir, exist_ok=True)
-    log_path=log_path.replace(" ", "-")
     if not log_path:
         log_path = os.path.join(out_dir, f"{os.path.splitext(os.path.basename(__file__))[0]}.log")
     log_level_dict = {"DEBUG": logging.DEBUG,
@@ -225,14 +224,14 @@ def get_residues_forming_an_hydrogen_bond(df):
     combinations_atoms_hydrogen_bonds_distances = []
     first_partner_types = []
     for idx, row in df.iterrows():
-        first = f"{row['ROI partner position']}{row['ROI partner residue']}"
-        second = f"{row['second partner position']}{row['second partner residue']}"
+        first = f"{row['residue 1 position']}{row['residue 1']}"
+        second = f"{row['residue 2 position']}{row['residue 2']}"
         if f"{first}_{second}" not in combinations and f"{second}_{first}" not in combinations:
             combinations.append(f"{first}_{second}")
-            tmp_df = df[(df["ROI partner position"] == row["ROI partner position"]) & (
-                        df["second partner position"] == row["second partner position"]) | (
-                                    df["second partner position"] == row["second partner position"]) & (
-                                    df["ROI partner position"] == row["ROI partner position"])]
+            tmp_df = df[(df["residue 1 position"] == row["residue 1 position"]) & (
+                        df["residue 2 position"] == row["residue 2 position"]) | (
+                                    df["residue 2 position"] == row["residue 2 position"]) & (
+                                    df["residue 1 position"] == row["residue 1 position"])]
             # get the median distance of all the atom hydrogen bonds between the two residues
             median_distances.append(statistics.median(tmp_df["median distance"]))
             combinations_nb_hydrogen_bonds.append(len(tmp_df.index))
@@ -257,18 +256,18 @@ def get_residues_forming_an_hydrogen_bond(df):
     df["number atoms contacts"] = combinations_nb_hydrogen_bonds
     df["atoms contacts"] = combinations_atoms_hydrogen_bonds
     df["atoms contacts distances"] = combinations_atoms_hydrogen_bonds_distances
-    df["ROI partner types"] = first_partner_types
+    df["partner types"] = first_partner_types
     # rename the columns
     df.rename(columns={"median distance": "median contacts distance"}, inplace=True)
     df.rename(columns={"hydrogen bond": "residues contact"}, inplace=True)
     # drop the "ROI partner type" column
     df.drop(["ROI partner type"], axis=1)
-    # sort on the values of the column "ROI partner position"
-    df = df.sort_values(by=["ROI partner position"])
+    # sort on the values of the column "residue 1 position"
+    df = df.sort_values(by=["residue 1 position"])
     # set the column order
-    cols = ["residues contact", "ROI partner position", "ROI partner residue", "second partner position",
-            "second partner residue", "median contacts distance", "number atoms contacts",
-            "atoms contacts", "atoms contacts distances", "ROI partner types"]
+    cols = ["residues contact", "residue 1 position", "residue 1", "residue 2 position",
+            "residue 2", "median contacts distance", "number atoms contacts",
+            "atoms contacts", "atoms contacts distances", "partner types"]
     df = df[cols]
     return df
 
@@ -318,10 +317,10 @@ def extract_residues_hydrogen_bonds(path_hydrogen_bonds, roi):
 
     # lose the notions of donor and acceptor to use ROI and second partner
     df_tmp = pd.DataFrame({"hydrogen bond": df_hydrogen_bonds_all["contact"],
-                           "ROI partner position": first_position,
-                           "ROI partner residue": first_residue,
-                           "second partner position": second_position,
-                           "second partner residue": second_residue,
+                           "residue 1 position": first_position,
+                           "residue 1": first_residue,
+                           "residue 2 position": second_position,
+                           "residue 2": second_residue,
                            "median distance": df_hydrogen_bonds_all["median distance"],
                            "ROI partner type": first_type})
     # reduce to residue hydrogen bonds
@@ -346,23 +345,23 @@ def heatmap_distances_nb_hydrogen_bonds(df):
     nb_hydrogen_bonds = {}
     firsts = []
     seconds = []
-    unique_first_positions = sorted(list(set(df["ROI partner position"])))
-    unique_second_positions = sorted(list(set(df["second partner position"])))
+    unique_first_positions = sorted(list(set(df["residue 1 position"])))
+    unique_second_positions = sorted(list(set(df["residue 2 position"])))
     for first_position in unique_first_positions:
         first = f"{first_position}" \
-                f"{df.loc[(df['ROI partner position'] == first_position), 'ROI partner residue'].values[0]}"
+                f"{df.loc[(df['residue 1 position'] == first_position), 'residue 1'].values[0]}"
         if first not in firsts:
             firsts.append(first)
         for second_position in unique_second_positions:
             second = f"{second_position}" \
-                     f"{df.loc[(df['second partner position'] == second_position), 'second partner residue'].values[0]}"
+                     f"{df.loc[(df['residue 2 position'] == second_position), 'residue 2'].values[0]}"
             if second not in seconds:
                 seconds.append(second)
             # get the distance
             if second_position not in distances:
                 distances[second_position] = []
-            dist = df.loc[(df["ROI partner position"] == first_position) & (
-                        df["second partner position"] == second_position), "median contacts distance"]
+            dist = df.loc[(df["residue 1 position"] == first_position) & (
+                        df["residue 2 position"] == second_position), "median contacts distance"]
             if not dist.empty:
                 distances[second_position].append(dist.values[0])
             else:
@@ -370,8 +369,8 @@ def heatmap_distances_nb_hydrogen_bonds(df):
             # get the number of hydrogen bonds
             if second_position not in nb_hydrogen_bonds:
                 nb_hydrogen_bonds[second_position] = []
-            hydrogen_bonds = df.loc[(df["ROI partner position"] == first_position) & (
-                        df["second partner position"] == second_position), "number atoms contacts"]
+            hydrogen_bonds = df.loc[(df["residue 1 position"] == first_position) & (
+                        df["residue 2 position"] == second_position), "number atoms contacts"]
             if not hydrogen_bonds.empty:
                 nb_hydrogen_bonds[second_position].append(hydrogen_bonds.values[0])
             else:
@@ -489,7 +488,7 @@ def hydrogen_bonds_residues_pairs(df, res_dist_thr):
     """
     idx_to_remove_for_residue_distance = []
     for idx, row in df.iterrows():
-        if abs(row["ROI partner position"] - row["second partner position"]) < res_dist_thr:
+        if abs(row["residue 1 position"] - row["residue 2 position"]) < res_dist_thr:
             idx_to_remove_for_residue_distance.append(idx)
     # remove rows with too close distance between the residues
     df.drop(idx_to_remove_for_residue_distance, inplace=True, axis=0)
@@ -542,12 +541,12 @@ def update_domains(df, domains, out_dir, params, roi_id):
     acceptors_regions = [None] * len(df)
     for idx, row_hydrogen_bonds in df.iterrows():
         for _, row_domains in domains.iterrows():
-            if row_domains["start"] <= row_hydrogen_bonds["ROI partner position"] <= row_domains["stop"]:
+            if row_domains["start"] <= row_hydrogen_bonds["residue 1 position"] <= row_domains["stop"]:
                 donors_regions[idx] = row_domains["domain"]
-            if row_domains["start"] <= row_hydrogen_bonds["second partner position"] <= row_domains["stop"]:
+            if row_domains["start"] <= row_hydrogen_bonds["residue 2 position"] <= row_domains["stop"]:
                 acceptors_regions[idx] = row_domains["domain"]
-    df.insert(3, "ROI partner domain", pd.DataFrame(donors_regions))
-    df.insert(6, "second partner domain", pd.DataFrame(acceptors_regions))
+    df.insert(3, "residue 1 domain", pd.DataFrame(donors_regions))
+    df.insert(6, "residue 2 domain", pd.DataFrame(acceptors_regions))
     out_path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}.csv")
     df.to_csv(out_path, index=False)
     logging.info(f"Pairs residues hydrogen bonds updated with domains saved: {out_path}")
@@ -575,7 +574,7 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_di
     """
     data = {}
     for _, row_domains in domains.iterrows():
-        tmp = df[df["second partner domain"] == row_domains["domain"]]
+        tmp = df[df["residue 2 domain"] == row_domains["domain"]]
         if not tmp.empty:
             if not row_domains["domain"] in data:
                 data[row_domains["domain"]] = 0
