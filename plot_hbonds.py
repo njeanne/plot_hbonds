@@ -424,7 +424,8 @@ def heatmap_hydrogen_bonds(hbonds, params, out_dir, output_fmt, roi_id):
     plt.title(subtitle)
     plt.xlabel("Whole protein residues", fontweight="bold")
     plt.ylabel(f"{roi_id} residues", fontweight="bold")
-    out_path = os.path.join(out_dir, f"heatmap_distances_{params['sample'].replace(' ', '_')}.{output_fmt}")
+    out_path = os.path.join(out_dir, f"heatmap_distances_{params['sample'].replace(' ', '_')}_"
+                                     f"{roi_id.replace(' ', '-')}.{output_fmt}")
     plot.savefig(out_path)
     # clear the plot for the next use of the function
     plt.clf()
@@ -547,7 +548,8 @@ def update_domains(df, domains, out_dir, params, roi_id):
                 acceptors_regions[idx] = row_domains["domain"]
     df.insert(3, "residue 1 domain", pd.DataFrame(donors_regions))
     df.insert(6, "residue 2 domain", pd.DataFrame(acceptors_regions))
-    out_path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}.csv")
+    out_path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}"
+                                     f"_{roi_id.replace(' ', '-')}.csv")
     df.to_csv(out_path, index=False)
     logging.info(f"Pairs residues hydrogen bonds updated with domains saved: {out_path}")
     return df
@@ -606,7 +608,8 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_di
               f"{params['parameters']['proportion hbonds']}% of hydrogen bonds in {params['frames']} "
               f"frames{md_duration}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
-    path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}.{fmt}")
+    path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_"
+                                 f"{roi_id.replace(' ', '-')}.{fmt}")
     fig.savefig(path, bbox_inches="tight")
     logging.info(f"Contacts by domain plot saved: {path}")
 
@@ -680,6 +683,7 @@ if __name__ == "__main__":
 
     # get the Region Of Interest if specified
     roi_limits = extract_roi(args.roi)
+
 
     # load the hydrogen bonds analysis parameters
     parameters_hydrogen_bonds_analysis = None
