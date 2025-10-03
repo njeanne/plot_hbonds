@@ -29,13 +29,13 @@ conda activate python3
 
 The script can be tested with the test data provided in the `data` directory, which contains the output CSV and the 
 YAML parameters files of the [trajectories_hbonds](https://github.com/njeanne/trajectories_hbonds) script, 
-respectively `hbonds_by_residue_sample-X.csv` and `sample-X_analysis.yaml`. The commands are:
+respectively `hbonds_by_residue_sample_X.csv` and `sample_X_analysis.yaml`. The commands are:
 
 ```shell script
 conda activate python3
 
-./plot_hbonds.py --out results --roi 682-840  --format svg \
---parameters data/sample-X_analysis.yaml data/hbonds_by_residue_sample-X.csv
+./plot_hbonds.py --out results --roi 682-850  --format svg \
+--parameters data/sample_X_analysis.yaml data/hbonds_by_residue_sample_X.csv
 
 conda deactivate
 ```
@@ -46,8 +46,8 @@ The commands are:
 ```shell script
 conda activate python3
 
-./plot_hbonds.py --out results --roi 682-840  --format svg --domains data/sample-X_domains.csv --residues-distance 10 \
---parameters data/sample-X_analysis.yaml data/hbonds_by_residue_sample-X.csv
+./plot_hbonds.py --out results --roi 682-850  --format svg --domains data/sample_X_domains.csv --residues-distance 10 \
+--parameters data/sample_X_analysis.yaml data/hbonds_by_residue_sample_X.csv
 
 conda deactivate
 ```

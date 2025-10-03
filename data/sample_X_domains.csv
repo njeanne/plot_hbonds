@@ -2,7 +2,7 @@ domain,start,end,color
 Methyltransferase,60,238,#0000b6
 Y domain,239,439,#02eded
 Protease,440,610,#00ea00
-Hinge,682,850,#ab0000
+PPR,682,850,#ab0000
 RPS17 insertion,748,806,#ad4a63
 X domain,857,1014,#e1e100
 Helicase,1032,1276,#e77504

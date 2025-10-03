@@ -1,0 +1,35 @@
+atoms: 27119
+frames: 245000
+frames selection:
+  Sample_X_0_MD-30M.nc:
+    begin: 10000
+    end: 15000
+molecules: 1
+parameters:
+  angle cutoff: 135
+  maximal atoms distance: 3.0
+  proportion hbonds: 50.0
+  time: 1020 ns
+pickle hydrogen bonds: /tmpdir/p24036jn/MD/analysis/hbonds/by_sample/50.0pct/insertions/MD-510M/Sample_X_analysis.pkl
+residues: 1765
+sample: Sample_X
+size Gb: 148.5084369778633
+topology file: Sample_X_0.parm
+trajectory files processed:
+- Sample_X_0_MD-30M.nc
+- Sample_X_0_MD-60M.nc
+- Sample_X_0_MD-90M.nc
+- Sample_X_0_MD-120M.nc
+- Sample_X_0_MD-150M.nc
+- Sample_X_0_MD-180M.nc
+- Sample_X_0_MD-210M.nc
+- Sample_X_0_MD-240M.nc
+- Sample_X_0_MD-270M.nc
+- Sample_X_0_MD-300M.nc
+- Sample_X_0_MD-330M.nc
+- Sample_X_0_MD-360M.nc
+- Sample_X_0_MD-390M.nc
+- Sample_X_0_MD-420M.nc
+- Sample_X_0_MD-450M.nc
+- Sample_X_0_MD-480M.nc
+- Sample_X_0_MD-510M.nc

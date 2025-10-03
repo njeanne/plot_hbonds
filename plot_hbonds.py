@@ -414,7 +414,7 @@ def heatmap_hydrogen_bonds(hbonds, params, out_dir, output_fmt, roi_id):
     heatmap.set_facecolor("lavender")
     heatmap.figure.axes[-1].yaxis.label.set_size(15)
     plot = heatmap.get_figure()
-    title = f"Hydrogen bonds residues median distance: {params['sample']} {roi_id} vs. whole protein"
+    title = f"Hydrogen bonds residues median distance: {params['sample'].replace('_', ' ')} {roi_id} vs. whole protein"
     plt.suptitle(title, fontsize="large", fontweight="bold")
     md_duration = f"MD length: {params['MD duration']}. " if "MD duration" in params else ""
     subtitle = f"{md_duration}The number of residue atoms forming hydrogen bonds is shown in the squares."
@@ -599,7 +599,7 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_di
 
     ax.set_xlabel(None)
     ax.set_ylabel(f"Hydrogen bonds with {roi_id}", fontweight="bold")
-    ax.text(x=0.5, y=1.1, s=f"{params['sample']}: Hydrogen bonds with {roi_id}",
+    ax.text(x=0.5, y=1.1, s=f"{params['sample'].replace('_', ' ')}: Hydrogen bonds with {roi_id}",
             weight="bold", ha="center", va="bottom", transform=ax.transAxes)
     md_duration = f", MD: {params['parameters']['time']}" if "time" in params['parameters'] else ""
     ax.text(x=0.5, y=1.0,
