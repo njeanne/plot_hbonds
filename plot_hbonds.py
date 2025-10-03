@@ -424,8 +424,8 @@ def heatmap_hydrogen_bonds(hbonds, params, out_dir, output_fmt, roi_id):
     plt.title(subtitle)
     plt.xlabel("Whole protein residues", fontweight="bold")
     plt.ylabel(f"{roi_id} residues", fontweight="bold")
-    out_path = os.path.join(out_dir, f"hydrogen-bonds_heatmap_{params['sample'].replace(' ', '_')}_"
-                                     f"{roi_id.replace(' ', '-')}.{output_fmt}")
+    out_path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_"
+                                     f"{roi_id.replace(' ', '-')}_heatmap.{output_fmt}")
     plot.savefig(out_path)
     # clear the plot for the next use of the function
     plt.clf()
@@ -609,9 +609,9 @@ def acceptors_domains_involved(df, domains, out_dir, params, roi_id, fmt, res_di
               f"frames{md_duration}",
             alpha=0.75, ha="center", va="bottom", transform=ax.transAxes)
     path = os.path.join(out_dir, f"hydrogen-bonds_{params['sample'].replace(' ', '_')}_"
-                                 f"{roi_id.replace(' ', '-')}.{fmt}")
+                                 f"{roi_id.replace(' ', '-')}_by-domain.{fmt}")
     fig.savefig(path, bbox_inches="tight")
-    logging.info(f"Contacts by domain plot saved: {path}")
+    logging.info(f"Hydrogen bonds plot by domain saved: {path}")
 
 
 if __name__ == "__main__":
