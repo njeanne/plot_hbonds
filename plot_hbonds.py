@@ -424,7 +424,7 @@ def heatmap_hydrogen_bonds(hbonds, params, out_dir, output_fmt, roi_id):
     plt.title(subtitle)
     plt.xlabel("Whole protein residues", fontweight="bold")
     plt.ylabel(f"{roi_id} residues", fontweight="bold")
-    out_path = os.path.join(out_dir, f"heatmap_distances_{params['sample'].replace(' ', '_')}_"
+    out_path = os.path.join(out_dir, f"hydrogen-bonds_heatmap_{params['sample'].replace(' ', '_')}_"
                                      f"{roi_id.replace(' ', '-')}.{output_fmt}")
     plot.savefig(out_path)
     # clear the plot for the next use of the function
